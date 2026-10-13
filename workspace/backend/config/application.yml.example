@@ -1,0 +1,91 @@
+# Copy to application.yml. Keep the .example extension on this file: initConfig() loads every *.yml in ./config.
+# Secrets are NOT written here: they are "${VAR}" placeholders filled from environment variables or
+# from config/.env (gitignored; start from config/.env.example). Real env vars win over config/.env.
+server:
+  mode: dev
+  port: 9091
+  org_id: 9
+database:
+  host: 127.0.0.1
+  port: 5555
+  user: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+  dbname:
+  sslmode: disable
+  max-open-conn: 5
+  max-idle-conn: 2
+ecommerce:
+  tiktok:
+    enable: true
+    url: https://open-api.tiktokglobalshop.com
+    app_key: "${TIKTOK_APP_KEY}"
+    app_secret: "${TIKTOK_APP_SECRET}"
+  lazada:
+    enable: true
+    url: https://api.lazada.co.th/rest
+    app_key: "${LAZADA_APP_KEY}"
+    app_secret: "${LAZADA_APP_SECRET}"
+  shopee:
+    partner_id:
+    shop_id:
+    url:
+    refresh_token: "${SHOPEE_REFRESH_TOKEN}"
+    partner_key: "${SHOPEE_PARTNER_KEY}"
+kafka:
+  enabled: false
+  producer:
+    bootstrap-servers: localhost:9093
+    security-protocol: SASL_PLAINTEXT
+    sasl-mechanisms:
+    sasl-username: "${KAFKA_PRODUCER_SASL_USERNAME}"
+    sasl-password: "${KAFKA_PRODUCER_SASL_PASSWORD}"
+    acks: all
+    topics-foo1:
+      name: foo1
+      partition: 1
+  consumer:
+    bootstrap-servers: localhost:9093
+    security-protocol: SASL_PLAINTEXT
+    sasl-mechanisms:
+    sasl-username: "${KAFKA_CONSUMER_SASL_USERNAME}"
+    sasl-password: "${KAFKA_CONSUMER_SASL_PASSWORD}"
+    acks: all
+    group_id: MQ
+    topics-foo1:
+      name: foo1
+connector:
+  enable: false  # true = also forward orders/DO updates to Connector; DB is always written
+  host:
+  authenticator: "${CONNECTOR_AUTHENTICATOR}"
+  callback:
+  user: "${CONNECTOR_USER}"
+  password: "${CONNECTOR_PASSWORD}"
+google-sheet-api:
+  spreadsheet-id: "${GOOGLE_SPREADSHEET_ID}"
+  sheet-name: Orders
+logistic:
+  enable: false
+  host:
+  client-id: "${LOGISTIC_CLIENT_ID}"
+  client-secret: "${LOGISTIC_CLIENT_SECRET}"
+  ffm-code:
+cronjob:
+  time-sample-cron: 0 1 * * * *
+# Admin-app login (EC-1). One block per environment; redirect-uri must be
+# registered as an "Authorized redirect URI" on the Google OAuth client.
+auth:
+  frontend-url: http://localhost:5173   # FE origin: post-login redirect target and the only allowed Origin
+  cookie-name: ecom_session
+  cookie-secure: false                  # true on every https environment
+  session-ttl-hours: 12
+  login-attempt-ttl-seconds: 600
+  max-failed-logins: 5
+  lockout-minutes: 15
+  remember-me-days: 7                   # session length when "Ghi nhớ đăng nhập" is ticked (otherwise session-ttl-hours, browser-session cookie)
+  google:
+    enable: false                       # true once client-id/secret are filled in
+    client-id: "${AUTH_GOOGLE_CLIENT_ID}"
+    client-secret: "${AUTH_GOOGLE_CLIENT_SECRET}"
+    redirect-uri: http://localhost:9091/api/v1/auth/google/callback
+    allowed-domains: ["mq.com"]         # [] = any domain
+    auto-provision: false               # true = any allowed-domain account gets an app_user on first login

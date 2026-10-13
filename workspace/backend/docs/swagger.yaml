@@ -1,0 +1,54 @@
+basePath: /api
+host: localhost:9091
+info:
+  contact:
+    email: ngonguyenminhquan@gmail.com
+    name: Quan Ngo
+  description: This is a sample document for API.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: MQ Document API
+  version: "1.0"
+paths:
+  /v1/lazada/lazadareadytoship:
+    post:
+      consumes:
+      - application/json
+      description: Receive webhook from Lazada
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Lazada Webhook
+      tags:
+      - webhook
+  /v1/lazada/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Receive webhook from Lazada
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Lazada Webhook
+      tags:
+      - webhook
+  /v1/tiktok/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Receive webhook from TiktokShop
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: TiktokShop Webhook
+      tags:
+      - webhook
+swagger: "2.0"

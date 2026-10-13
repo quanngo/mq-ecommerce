@@ -1,0 +1,19 @@
+ecosystem.config.js
+.pm2/
+*.log
+
+# Secrets: never commit. See workspace/backend/config/application.yml.example
+workspace/backend/config/application.yml
+workspace/backend/config/service-account.json
+*.pem
+
+# Local state
+.workflow/
+.DS_Store
+.claude/settings.local.json
+__pycache__/
+*.pyc
+
+# Local secrets for config placeholders ("${VAR}"); see workspace/backend/config/.env.example
+.env
+!*.env.example

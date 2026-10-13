@@ -1,0 +1,49 @@
+workers:
+  - name: create_ecommerce_order
+    time-run: "@every 30s"
+    function: createEcommerceOrder
+    enable: false 
+  - name: scan_platform_order
+    time-run: "@every 30s"
+    function: scanPlatformOrder
+    enable: false 
+  - name: scan_platform_order_pending
+    time-run: "@every 30s"
+    function: scanPlatformOrderPending
+    enable: false   
+  - name: scan_platform_order_refund
+    time-run: "@every 30s"
+    function: scanPlatformOrderRefund
+    enable: false   
+  - name: scan_platform_order_to_Ship
+    time-run: "@every 30s"
+    function: scanPlatformOrderToShip
+    enable: false     
+  - name: scan_platform_order_payment
+    time-run: "@every 30s"
+    function: scanPlatformOrderPayment
+    enable: false       
+  - name: scan_statement_transaction
+    time-run: "@every 30s"
+    function: scanStatementTransaction
+    enable: true
+  # - name: scan_order_lazada
+  #   time-run: "@every 30s"
+  #   function: scanOrderLazada
+  #   enable: false
+  # - name: check_expired_token_lazada
+  #   time-run: "@every 1H"
+  #   function: checkExpiredTokenLazada
+  #   enable: false
+  # - name: scan_order_tiktok
+  #   time-run: "@every 30s"
+  #   function: scanOrderTiktok
+  #   enable: false
+  # - name: check_expired_token_tiktok
+  #   time-run: "@every 1H"
+  #   function: checkExpiredTokenTiktok
+  #   enable: false
+  - name: cleanup_auth_sessions
+    time-run: "@every 1h"
+    function: cleanupAuthSessions
+    enable: true

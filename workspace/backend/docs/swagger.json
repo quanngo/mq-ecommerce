@@ -1,0 +1,81 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "This is a sample document for API.",
+        "title": "MQ Document API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Quan Ngo",
+            "email": "ngonguyenminhquan@gmail.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:9091",
+    "basePath": "/api",
+    "paths": {
+        "/v1/lazada/lazadareadytoship": {
+            "post": {
+                "description": "Receive webhook from Lazada",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhook"
+                ],
+                "summary": "Lazada Webhook",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/v1/lazada/webhook": {
+            "post": {
+                "description": "Receive webhook from Lazada",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhook"
+                ],
+                "summary": "Lazada Webhook",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/v1/tiktok/webhook": {
+            "post": {
+                "description": "Receive webhook from TiktokShop",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhook"
+                ],
+                "summary": "TiktokShop Webhook",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        }
+    }
+}
