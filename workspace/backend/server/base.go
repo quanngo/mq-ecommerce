@@ -29,6 +29,8 @@ type apiServer struct {
 	connectorService services.ConnectorService
 	tiktokService    services.TikTokService
 	authService      services.AuthService
+	usersService     services.UserAdminService
+	ordersService    services.OrderService
 }
 
 type workerInstance struct {
@@ -112,6 +114,9 @@ func Initialize() *apiServer {
 	lazadaService := services.NewLazadaService(utils.AppConfig, apiMiddleware, connectorRepo, tokenRepo, marketPlaceMappingRepo, logMarketPlaceOrderRepo, connectorService, logisticSvc)
 	tiktokService := services.NewTikTokService(utils.AppConfig, apiMiddleware, connectorRepo, tokenRepo, marketPlaceMappingRepo, logMarketPlaceOrderRepo, connectorService, logisticSvc)
 	authService := newAuthService(db, utils.AppConfig.Auth, newGoogleClient(utils.AppConfig.Auth.Google))
+	usersService := services.NewUserAdminService(repositories.NewUserRepo(db), repositories.NewRoleRepo(db), repositories.NewSessionRepo(db), authService)
+	ordersService := services.NewOrderService(repositories.NewOrderQueryRepo(db))
+	authService.WarnIfDefaultAdminPassword(context.Background())
 
 	return &apiServer{
 		apiMiddleware:    apiMiddleware,
@@ -120,6 +125,8 @@ func Initialize() *apiServer {
 		lazadaService:    lazadaService,
 		tiktokService:    tiktokService,
 		authService:      authService,
+		usersService:     usersService,
+		ordersService:    ordersService,
 	}
 }
 
@@ -158,6 +165,8 @@ func (apiServer *apiServer) Start() {
 		TiktokSvc:     apiServer.tiktokService,
 		LazadaSvc:     apiServer.lazadaService,
 		AuthSvc:       apiServer.authService,
+		UsersSvc:      apiServer.usersService,
+		OrdersSvc:     apiServer.ordersService,
 	})
 
 	app.Run(fmt.Sprintf(":%d", apiServer.cfg.Server.Port))

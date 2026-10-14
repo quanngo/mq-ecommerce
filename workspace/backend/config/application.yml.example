@@ -74,14 +74,16 @@ cronjob:
 # Admin-app login (EC-1). One block per environment; redirect-uri must be
 # registered as an "Authorized redirect URI" on the Google OAuth client.
 auth:
-  frontend-url: http://localhost:5173   # FE origin: post-login redirect target and the only allowed Origin
+  frontend-url: http://localhost:8088   # FE origin: post-login redirect target and the only allowed Origin
   cookie-name: ecom_session
   cookie-secure: false                  # true on every https environment
   session-ttl-hours: 12
   login-attempt-ttl-seconds: 600
   max-failed-logins: 5
   lockout-minutes: 15
-  remember-me-days: 7                   # session length when "Ghi nhớ đăng nhập" is ticked (otherwise session-ttl-hours, browser-session cookie)
+  min-password-length: 10               # for new/changed passwords (the seeded default admin 123456 is exempt)
+  default-role: viewer                  # role for auto-provisioned Google users / create-user without --role
+  remember-me-days: 7                  # session length when "Ghi nhớ đăng nhập" is ticked (otherwise session-ttl-hours, browser-session cookie)
   google:
     enable: false                       # true once client-id/secret are filled in
     client-id: "${AUTH_GOOGLE_CLIENT_ID}"

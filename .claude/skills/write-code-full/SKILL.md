@@ -1,6 +1,6 @@
 ---
 name: write-code-full
-description: Implement a fullstack feature end to end in this workspace. The Go backend is in workspace/backend (Gin + sqlx, migrations, the always-HTTP-200 response envelope); the admin app is in workspace/frontend/admin (React 18 + Vite, plain JavaScript/JSX, not TypeScript). Clarify schema, contract and UI placement, then implement both sides, wire the frontend to the real contract, write unit tests on both sides, update API_DOCUMENT.md, add e2e coverage, and run the checks. Use when asked to build a feature or "add X to the app" spanning backend and frontend.
+description: Implement a fullstack feature end to end in this workspace. The Go backend is in workspace/backend (Gin + sqlx, migrations, the always-HTTP-200 response envelope); the admin app is in workspace/frontend (React 18 + Vite, plain JavaScript/JSX, not TypeScript). Clarify schema, contract and UI placement, then implement both sides, wire the frontend to the real contract, write unit tests on both sides, update API_DOCUMENT.md, add e2e coverage, and run the checks. Use when asked to build a feature or "add X to the app" spanning backend and frontend.
 ---
 
 Implement the feature end to end, grounded in what the code actually shows.
@@ -12,7 +12,7 @@ Never invent schema, an API shape or a convention. Ask the developer rather than
 
 2. **Read both sides.**
    - Root `CLAUDE.md`: architecture, the backend's layering, the response convention.
-   - `workspace/frontend/admin/CLAUDE.md`: frontend stack, layout, conventions and
+   - `workspace/frontend/CLAUDE.md`: frontend stack, layout, conventions and
      tests. The frontend is **plain JavaScript**. Never add TypeScript or
      `.ts`/`.tsx` files.
    - The backend code lives **directly in `workspace/backend/`**, not
@@ -58,7 +58,7 @@ Never invent schema, an API shape or a convention. Ask the developer rather than
    - **Logging**: `utils.ShowInfoLogs`/`ShowErrorLogs`. Never log tokens, passwords
      or whole token or credential structs.
 
-6. **Frontend** (`workspace/frontend/admin/`), as in `write-code-fe` step 6:
+6. **Frontend** (`workspace/frontend/`), as in `write-code-fe` step 6:
    - API functions go in `src/api/<area>.js` and call `apiRequest`.
    - The route goes in `App.jsx`, inside `ProtectedRoute` if it needs login.
    - The page goes in `src/pages/<Name>Page.jsx` with a CSS module that uses the
@@ -87,7 +87,7 @@ Never invent schema, an API shape or a convention. Ask the developer rather than
    hand-written prose. Add swag annotations on new handlers like the ones in
    `auth_handler.go`.
 
-10. **E2E**: add `workspace/frontend/admin/e2e/<feature>.spec.js` (Playwright)
+10. **E2E**: add `workspace/frontend/e2e/<feature>.spec.js` (Playwright)
     for the main user flow against the real backend. It should skip itself when
     the env vars or test data it needs are missing, and its header comment should
     say how to seed them.
@@ -95,7 +95,7 @@ Never invent schema, an API shape or a convention. Ask the developer rather than
 11. **Verify, then report the real results** (never claim a check you didn't run):
     - Backend: `bash .claude/skills/backend-check/check.sh` (tidy, gofmt on
       changed files, build, vet, test, secret scan).
-    - Frontend: `npm test && npm run build` in `workspace/frontend/admin/`.
+    - Frontend: `npm test && npm run build` in `workspace/frontend/`.
     - DB integration and e2e tests: say whether they ran. They need a test
       Postgres and a running stack.
 

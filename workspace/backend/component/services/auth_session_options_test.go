@@ -9,7 +9,9 @@ import (
 )
 
 func TestRememberMe_PasswordLogin(t *testing.T) {
-	fixed := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	// The fake session store checks expiry against the wall clock, so the
+	// service clock must be "now" too (a fixed past date expires the session).
+	fixed := time.Now().UTC().Truncate(time.Second)
 	cases := []struct {
 		name       string
 		cfg        utils.AuthConfig

@@ -6,9 +6,13 @@ import (
 	_ "main/docs"
 )
 
-// @title           MQ Document API
+// @title           MQ E-commerce Admin API
 // @version         1.0
-// @description     This is a sample document for API.
+// @description     Backend of the MQ e-commerce admin app (marketplace order sync, login, users, orders).
+// @description
+// @description     Every JSON endpoint answers HTTP 200 with the envelope {code, message, data}: `code` is the real status, `message` the error code on failure (e.g. UNAUTHENTICATED, FORBIDDEN), and `data` is an array whose first element is the documented response model.
+// @description
+// @description     Auth: sign in with POST /v1/auth/login (or the Google flow), which sets the httpOnly `ecom_session` cookie; send it with every request. State-changing calls must come from the frontend origin (Origin header checked). Required permissions per route: see workspace/backend/API_DOCUMENT.md.
 // @termsOfService  http://swagger.io/terms/
 
 // @contact.name   Quan Ngo

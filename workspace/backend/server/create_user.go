@@ -16,13 +16,13 @@ import (
 
 // RunCreateUser implements `go run main.go create-user`:
 //
-//	go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen" --password-stdin < pw.txt
-//	go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen"   # Google-only account
+//	go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen" --role admin --password-stdin < pw.txt
+//	go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen"   # Google-only, auth.default-role
 //
 // The password is only ever read from stdin, so it never lands in shell
-// history or the process list.
+// history or the process list. Roles: admin | operator | viewer (migrations/004).
 func RunCreateUser(args []string) {
-	email, name, password, err := parseCreateUserArgs(args, os.Stdin)
+	in, err := parseCreateUserArgs(args, os.Stdin)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "create-user:", err)
 		os.Exit(2)
@@ -35,42 +35,45 @@ func RunCreateUser(args []string) {
 	db := internal.NewPgDatabase().ConnectPgDatabase(utils.AppConfig.Database)
 	authSvc := newAuthService(db, utils.AppConfig.Auth, nil)
 
-	id, err := authSvc.CreateUser(context.Background(), services.CreateUserInput{Email: email, DisplayName: name, Password: password})
+	id, err := authSvc.CreateUser(context.Background(), in)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "create-user:", err)
 		os.Exit(1)
 	}
 	kind := "google-only"
-	if password != nil {
+	if in.Password != nil {
 		kind = "password + google"
 	}
-	fmt.Printf("created app_user id=%d (%s)\n", id, kind)
+	role := in.Role
+	if role == "" {
+		role = utils.AppConfig.Auth.WithDefaults().DefaultRole
+	}
+	fmt.Printf("created app_user id=%d role=%s (%s)\n", id, role, kind)
 }
 
-func parseCreateUserArgs(args []string, stdin io.Reader) (email, name string, password *string, err error) {
+func parseCreateUserArgs(args []string, stdin io.Reader) (services.CreateUserInput, error) {
+	var in services.CreateUserInput
 	fs := flag.NewFlagSet("create-user", flag.ContinueOnError)
-	fs.StringVar(&email, "email", "", "login email (required)")
-	fs.StringVar(&name, "name", "", "display name")
+	fs.StringVar(&in.Email, "email", "", "login email (required)")
+	fs.StringVar(&in.DisplayName, "name", "", "display name")
+	fs.StringVar(&in.Role, "role", "", "role code: admin | operator | viewer (default: auth.default-role)")
 	pwStdin := fs.Bool("password-stdin", false, "read the password from the first line of stdin")
-	if err = fs.Parse(args); err != nil {
-		return
+	if err := fs.Parse(args); err != nil {
+		return in, err
 	}
-	if strings.TrimSpace(email) == "" {
-		err = errors.New("--email is required")
-		return
+	if strings.TrimSpace(in.Email) == "" {
+		return in, errors.New("--email is required")
 	}
 	if *pwStdin {
-		line, rerr := bufio.NewReader(stdin).ReadString('\n')
-		if rerr != nil && rerr != io.EOF {
-			err = rerr
-			return
+		line, err := bufio.NewReader(stdin).ReadString('\n')
+		if err != nil && err != io.EOF {
+			return in, err
 		}
 		pw := strings.TrimRight(line, "\r\n")
 		if pw == "" {
-			err = errors.New("--password-stdin given but stdin was empty")
-			return
+			return in, errors.New("--password-stdin given but stdin was empty")
 		}
-		password = &pw
+		in.Password = &pw
 	}
-	return
+	return in, nil
 }

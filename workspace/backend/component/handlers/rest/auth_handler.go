@@ -30,6 +30,7 @@ func (h *AuthHandler) Router(r *gin.RouterGroup, requireAuth, sameOrigin gin.Han
 	r.GET("me", requireAuth, h.Me)
 	r.POST("logout", sameOrigin, h.Logout)
 	r.POST("logout-all", sameOrigin, requireAuth, h.LogoutAll)
+	r.POST("change-password", sameOrigin, requireAuth, h.ChangePassword)
 	return r
 }
 
@@ -183,7 +184,33 @@ func (h *AuthHandler) clearSessionCookie(c *gin.Context) {
 }
 
 // respondError sends only the stable error code; the cause goes to the logs.
-func (h *AuthHandler) respondError(c *gin.Context, err error) {
+// ChangePassword godoc
+// @Summary  Change your own password (current password required if you have one); signs out your other sessions
+// @Tags     auth
+// @Accept   json
+// @Produce  json
+// @Param    body body models.ChangePasswordRequest true "passwords"
+// @Success  200
+// @Router   /v1/auth/change-password [post]
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var req models.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.respondError(c, services.ErrInvalidRequest) // never echo the body
+		return
+	}
+	if err := h.AuthSvc.ChangePassword(c.Request.Context(), middleware.CurrentUser(c), req.CurrentPassword, req.NewPassword); err != nil {
+		h.respondError(c, err)
+		return
+	}
+	noStore(c)
+	api.Ok(c)
+}
+
+func (h *AuthHandler) respondError(c *gin.Context, err error) { respondAuthError(c, err) }
+
+// respondAuthError sends only the stable error code; the cause goes to the
+// logs (for server errors only, so expected 4xx don't flood them).
+func respondAuthError(c *gin.Context, err error) {
 	ae := services.AsAuthError(err)
 	if ae.Status >= http.StatusInternalServerError {
 		utils.ShowErrorLogs(err)

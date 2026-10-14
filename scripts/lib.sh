@@ -74,8 +74,26 @@ warn_if_untrusted() {
 }
 
 # project_dir <type: frontend|backend, lowercase> <key>
+# Default: workspace/<type>/<key>. An optional <TYPE>_DIR_<N> in projects.env
+# overrides it, relative to workspace/<type>/ ("." = workspace/<type> itself,
+# for a project that lives directly in this repo).
 project_dir() {
   local type_lower="$1" key="$2"
+  local type_upper count_var i key_var dir_var
+  type_upper="$(echo "$type_lower" | tr '[:lower:]' '[:upper:]')"
+  count_var="${type_upper}_COUNT"
+  for ((i = 1; i <= ${!count_var:-0}; i++)); do
+    key_var="${type_upper}_KEY_${i}"
+    dir_var="${type_upper}_DIR_${i}"
+    if [[ "${!key_var}" == "$key" && -n "${!dir_var:-}" ]]; then
+      if [[ "${!dir_var}" == "." ]]; then
+        echo "$ROOT_DIR/workspace/${type_lower}"
+      else
+        echo "$ROOT_DIR/workspace/${type_lower}/${!dir_var}"
+      fi
+      return
+    fi
+  done
   echo "$ROOT_DIR/workspace/${type_lower}/${key}"
 }
 

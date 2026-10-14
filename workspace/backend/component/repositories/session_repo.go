@@ -35,9 +35,13 @@ func (r *SessionRepo) Create(ctx context.Context, tokenHash string, userID int64
 // or its user is disabled, so disabling a user logs them out on the next request.
 func (r *SessionRepo) GetValid(ctx context.Context, tokenHash string) (*models.SessionUser, error) {
 	strSql := `
-		SELECT u.*, s.auth_method, s.token_hash
+		SELECT ` + appUserColumns("u") + `, s.auth_method, s.token_hash,
+		       r.code AS role_code, r.name AS role_name,
+		       COALESCE(ARRAY(SELECT rp.permission_code FROM public.role_permission rp
+		                      WHERE rp.role_id = r.id ORDER BY rp.permission_code), '{}') AS permissions
 		FROM public.user_session s
 		JOIN public.app_user u ON u.id = s.user_id
+		JOIN public.role r ON r.id = u.role_id
 		WHERE s.token_hash = $1
 		  AND s.revoked_at IS NULL
 		  AND s.expires_at > NOW()
@@ -64,6 +68,17 @@ func (r *SessionRepo) Revoke(ctx context.Context, tokenHash string) error {
 func (r *SessionRepo) RevokeAllForUser(ctx context.Context, userID int64) (int64, error) {
 	strSql := `UPDATE public.user_session SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`
 	result, err := r.db.ExecContext(ctx, strSql, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// RevokeAllForUserExcept revokes the user's sessions other than keepHash
+// (used after a password change: other devices are signed out, this one stays).
+func (r *SessionRepo) RevokeAllForUserExcept(ctx context.Context, userID int64, keepHash string) (int64, error) {
+	strSql := `UPDATE public.user_session SET revoked_at = NOW() WHERE user_id = $1 AND token_hash <> $2 AND revoked_at IS NULL`
+	result, err := r.db.ExecContext(ctx, strSql, userID, keepHash)
 	if err != nil {
 		return 0, err
 	}

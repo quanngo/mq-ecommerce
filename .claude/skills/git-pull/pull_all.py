@@ -34,6 +34,15 @@ def parse_env(path: Path) -> dict:
     return env
 
 
+def project_dir(env: dict, type_upper: str, i: int, key: str) -> Path:
+    """workspace/<type>/<key>, or <TYPE>_DIR_<N> from projects.env ("." = workspace/<type>)."""
+    base = ROOT_DIR / "workspace" / type_upper.lower()
+    override = env.get(f"{type_upper}_DIR_{i}", "").strip()
+    if override == ".":
+        return base
+    return base / (override or key)
+
+
 def list_projects(env: dict):
     projects = []
     for type_upper in ("FRONTEND", "BACKEND"):
@@ -46,7 +55,7 @@ def list_projects(env: dict):
             projects.append({
                 "key": key,
                 "type": type_lower,
-                "dir": ROOT_DIR / "workspace" / type_lower / key,
+                "dir": project_dir(env, type_upper, i, key),
             })
     return projects
 

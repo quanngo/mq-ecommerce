@@ -1,6 +1,6 @@
 ---
 name: admin-auth
-description: Work with admin-app login (EC-1). The Go backend runs Google OIDC plus internal email/password with server-side sessions in an httpOnly cookie, and the React (JS) app lives in workspace/frontend/admin. Covers protecting a new backend endpoint with RequireAuth, reading the signed-in user, creating internal users with the create-user CLI, configuring Google per environment (allowed-domains / auto-provision), adding an auth error code end to end, the security rules that must not regress, and how to test. Use when asked to require login on an endpoint, add or disable a user, set up Google sign-in for an environment, change who may log in, debug a login failure, or touch any auth code.
+description: Work with admin-app login (EC-1) and roles/permissions. The Go backend runs Google OIDC plus internal email/password with server-side sessions in an httpOnly cookie, and the React (JS) app lives in workspace/frontend. Covers protecting a new backend endpoint with RequireAuth / RequirePermission, reading the signed-in user and their permissions, the role model (admin/operator/viewer, default admin@mq.com) and permission codes (users.read/manage, orders.read/detail/write), the user-management page and API, the Orders menu as the reference permission-guarded feature, creating users with the create-user CLI, configuring Google per environment (allowed-domains / auto-provision), adding an auth error code end to end, the security rules that must not regress, and how to test. Use when asked to require login or a permission on an endpoint, add a permission or role, add, disable or reset a user, set up Google sign-in for an environment, change who may log in, debug a login failure, or touch any auth code.
 ---
 
 Login is a security boundary. Read the files named below before changing
@@ -11,23 +11,91 @@ the EC-1 acceptance criteria, and most are enforced by a test.
 
 | Concern | File (relative to `workspace/backend/` unless noted) |
 |---|---|
-| Schema | `migrations/002_create_auth.sql`: `app_user`, `user_session`, `oauth_login_attempt`; `003_auth_remember_me.sql`: `oauth_login_attempt.remember_me` |
+| Schema | `migrations/002_create_auth.sql`: `app_user`, `user_session`, `oauth_login_attempt`; `003_auth_remember_me.sql`: `oauth_login_attempt.remember_me`; `004_rbac_and_default_admin.sql`: `role`, `permission`, `role_permission`, `app_user.role_id`, default admin; `005_orders_detail_permission.sql`: `orders.detail` for every seeded role |
+| Roles & users | `component/services/user_admin_service.go` (`UserAdminService`), `component/repositories/role_repo.go`, `component/handlers/rest/user_admin_handler.go` (`/api/v1/users`, `/api/v1/roles`), permission codes in `component/models/auth_model.go` (`PermUsersRead`…) |
 | Config | `utils/config.go` `AuthConfig` / `GoogleAuthConfig` + `WithDefaults()`; documented in `config/application.yml.example` (`auth:` block) |
 | Business logic | `component/services/auth_service.go` (`AuthService`), `auth_errors.go` (stable error codes), `google_oidc.go` (Google behind the `OIDCClient` interface) |
 | SQL | `component/repositories/user_repo.go`, `session_repo.go`, `login_attempt_repo.go` |
 | HTTP | `component/handlers/rest/auth_handler.go`, mounted in `rest.go` under `/api/v1/auth` |
-| Middleware | `middleware/require_auth.go`: `RequireAuth`, `CurrentUser`, `RequireSameOrigin` |
+| Middleware | `middleware/require_auth.go`: `RequireAuth`, `RequirePermission`, `CurrentUser`, `RequireSameOrigin` |
 | Wiring | `server/base.go` `Initialize()` (`newAuthService`, `newGoogleClient`), `InitializeWorkers()`; `server/create_user.go`; `main.go` |
 | Cleanup job | `cleanupAuthSessions` in `server/workers.go` + `config/workers.yml` |
-| Frontend | `workspace/frontend/admin/src/`: `api/client.js`, `api/auth.js`, `auth/AuthContext.jsx` (`login`/`logout`/`logoutAll`), `auth/authChannel.js` (cross-tab sync), `auth/ProtectedRoute.jsx`, `auth/errorMessages.js`, `pages/LoginPage.jsx`, `pages/ProfilePage.jsx`, `pages/ConfirmDialog.jsx` |
+| Frontend | `workspace/frontend/src/`: `api/client.js`, `api/auth.js`, `api/users.js`, `auth/AuthContext.jsx` (`login`/`logout`/`logoutAll`/`can`), `auth/authChannel.js` (cross-tab sync), `auth/ProtectedRoute.jsx` (`permission` prop), `auth/errorMessages.js` (+ `PERMISSION_LABELS`), `pages/AppLayout.jsx` (top bar, menu, logout), `pages/LoginPage.jsx`, `pages/ProfilePage.jsx`, `pages/ChangePasswordPage.jsx`, `pages/UsersPage.jsx`, `pages/ConfirmDialog.jsx`, `pages/Modal.jsx` |
+| Permission-guarded feature (reference) | Orders menu (EC-4): `component/handlers/rest/order_handler.go` (per-route `RequirePermission`), `component/services/order_service.go`, `component/repositories/order_query_repo.go`; FE `api/orders.js`, `pages/OrdersPage.jsx`, `pages/OrderDetailPage.jsx`, routes in `App.jsx`, menu item in `AppLayout.jsx`. API: `workspace/backend/API_DOCUMENT.md` |
 | Design | `.workflow/EC-1/design.md` (if present locally; `.workflow/` is gitignored) |
 
 Endpoints: `GET providers`, `GET google/login[?next=&remember=1]`, `GET google/callback`,
 `POST login` (`{email, password, remember_me}`), `GET me` (needs a session),
-`POST logout` (this browser), and `POST logout-all` (needs a session; revokes every
-session of the user and returns `{revoked_sessions}`). All are under
+`POST logout` (this browser), `POST logout-all` (needs a session; revokes every
+session of the user and returns `{revoked_sessions}`), and `POST change-password`
+(`{current_password, new_password}`; signs out the user's other sessions). All are under
 `/api/v1/auth`. JSON responses follow the repo convention: always HTTP 200,
 the real status in `code`, the error code in `message`, and `data` as an array.
+`/auth/me` and the login response include `role {code, name}` and `permissions []`.
+
+User management, all needing a session:
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/api/v1/users` | `users.read` | Returns `{users}`. |
+| GET | `/api/v1/roles` | `users.read` | Returns `{roles}` with their permissions. |
+| POST | `/api/v1/users` | `users.manage` + same origin | Body `{email, display_name, role, password?}`. Leave out `password` for a Google-only account. |
+| PATCH | `/api/v1/users/:id` | `users.manage` + same origin | Body `{display_name?, role?, status?}`. |
+| POST | `/api/v1/users/:id/reset-password` | `users.manage` + same origin | Body `{password}`. Signs the user out everywhere. |
+
+### Roles and permissions
+
+- **Model:** each user has exactly one role (`app_user.role_id`). A role grants
+  permission codes through `role_permission`. **Code checks permissions, never role
+  names:**
+  - backend: `middleware.RequirePermission(models.PermUsersManage)` or `user.Can(...)`;
+  - frontend: `useAuth().can('users.manage')` or `<ProtectedRoute permission=…>`.
+- **Permission codes** (`models.Perm…` in `auth_model.go`, labels in `PERMISSION_LABELS`):
+  | Code | Constant | Guards |
+  |---|---|---|
+  | `users.read` | `PermUsersRead` | `GET /users`, `GET /roles`; FE menu "Người dùng", `/users` |
+  | `users.manage` | `PermUsersManage` | `POST /users`, `PATCH /users/:id`, `POST /users/:id/reset-password`; FE create/role/lock/reset controls |
+  | `orders.read` | `PermOrdersRead` | `GET /orders` (list); FE menu "Đơn hàng", `/orders` |
+  | `orders.detail` | `PermOrdersDetail` | `GET /orders/:id` (detail, with phone/address/items); FE `/orders/:id` and the order-id link in the list |
+  | `orders.write` | `PermOrdersWrite` | nothing yet (reserved for order updates) |
+- **Seeded** by `004` + `005`, all `is_system`:
+  | Role | Permissions |
+  |---|---|
+  | `admin` (Quản trị viên) | all five |
+  | `operator` (Vận hành) | `orders.read`, `orders.detail`, `orders.write` |
+  | `viewer` (Chỉ xem) | `orders.read`, `orders.detail` |
+
+  `orders.detail` is separate from `orders.read` so a role can see the list
+  without opening details; today every seeded role has both (developer's
+  choice, EC-4). To take it from a role, delete its `role_permission` row.
+- **Adding a permission:**
+  1. Write a new migration that inserts into `permission` and `role_permission`
+     (`005_orders_detail_permission.sql` is the template).
+  2. Add a `Perm…` constant in `auth_model.go`.
+  3. Add a label to `PERMISSION_LABELS`.
+  4. Guard the route with `RequirePermission` and the FE route with
+     `<ProtectedRoute permission=…>`; hide links/menu items with `can(…)`.
+  5. Update the role counts in `TestRBACRepos`, the role lists in
+     `src/test/server.js` and `mock/dev-backend.js`, and the tables above.
+
+  There is no UI for editing roles. Change them with SQL or a migration.
+- **Rules enforced by `UserAdminService`:**
+  - Nobody can change their own role or status, or reset their own password,
+    through user management (`CANNOT_MODIFY_SELF`). Use "Đổi mật khẩu" for your
+    own password.
+  - The last active user with `users.manage` can't be demoted or disabled (`LAST_ADMIN`).
+  - Disabling a user or resetting their password revokes all their sessions.
+- **Default role** for auto-provisioned Google users and `create-user` without
+  `--role` is `auth.default-role` (default `viewer`). Users that existed before `004`
+  became `viewer`.
+- **Default admin:** `004` seeds `admin@mq.com` / `123456` in **every** environment
+  (requested by the developer). It is not created again if the account already
+  exists. Every start logs `[SECURITY] admin@mq.com still uses the default password…`
+  until the password is changed. Tell whoever deploys to change it right after the
+  first login.
+- **Password policy:** `auth.min-password-length` (default 10, up to 72 bytes) applies
+  to every new or changed password. The seeded admin is exempt only because its hash
+  is written directly by the migration.
 
 ### Session lifetime and logout behaviour
 
@@ -54,11 +122,24 @@ the real status in `code`, the error code in `message`, and `data` as an array.
 
 Routes inside the `/api/v1/tiktok` and `/api/v1/lazada` groups are already
 protected, because `rest.go` builds them with `apiGroup.Group("/tiktok", requireAuth)`.
-For a new group, do the same in `APIRoutes`:
+For a new group, do the same in `APIRoutes`, and put the permission on each
+route (as `/orders` does):
 
 ```go
+// rest.go
 ordersHandler.Router(apiGroup.Group("/orders", requireAuth))
+
+// order_handler.go
+r.GET("", middleware.RequirePermission(models.PermOrdersRead), h.List)
+r.GET("/:id", middleware.RequirePermission(models.PermOrdersDetail), h.Get)
 ```
+
+On the FE, wrap the route in `<ProtectedRoute permission="…">` inside the
+signed-in `<Route element={<AppLayout />}>` block of `App.jsx`, and show the
+menu item only when `can('…')`. Test both: a handler test through `APIRoutes`
+with sessions that have and lack the permission (`order_handler_test.go`), and
+a Vitest case that removes the permission with `backend.withoutPermissions`
+(`OrdersPage.test.jsx`).
 
 Inside a handler, read the user with `middleware.CurrentUser(c)` (`*models.SessionUser`:
 `ID`, `Email`, `DisplayName`, `AuthMethod`, …). For a state-changing route
@@ -74,20 +155,23 @@ test therefore has to hit a real route, not a made-up path (a made-up path just 
 
 ### Create, disable or re-enable a user
 
-There is no admin UI. Run these from `workspace/backend/` with the target
-environment's `config/application.yml`:
+Normally this is done in the UI: **Người dùng** (`/users`). It is visible with
+`users.read`; `users.manage` is needed to create users, change role or status, and
+reset passwords.
+
+Without the UI (bootstrap, scripts), run these from `workspace/backend/`:
 
 ```bash
 # internal password user (password is read from stdin: never pass it as an argument)
-echo 'a-long-password' | go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen" --password-stdin
-# Google-only user (no password; must sign in with Google)
+echo 'a-long-password' | go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen" --role admin --password-stdin
+# Google-only user (no password; must sign in with Google); role = auth.default-role
 go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen"
 ```
 
-Passwords must be 10–72 bytes. Emails are lower-cased. To disable or enable
-a user, confirm with the developer first and then use SQL. Disabling takes
-effect on the user's next request, because `SessionRepo.GetValid` joins on
-`status = 'active'`:
+Passwords must be at least `auth.min-password-length` (default 10) and at most
+72 bytes. Emails are lower-cased. To disable or enable a user without the UI,
+confirm with the developer first and then use SQL. Disabling takes effect on the
+user's next request, because `SessionRepo.GetValid` joins on `status = 'active'`:
 
 ```sql
 UPDATE public.app_user SET status = 'disabled', updated_at = NOW() WHERE email = 'x@mq.com';
@@ -112,7 +196,9 @@ Never print, copy or commit `password_hash`, `user_session.token_hash`, or anyth
    environment uses https.
 3. Restart the service. On startup `newGoogleClient` runs OIDC discovery. If it fails,
    or config is missing, the log shows `Google login disabled: …`, password login
-   keeps working, and `GET /api/v1/auth/providers` returns `google: false`.
+   keeps working, and `GET /api/v1/auth/providers` returns `google: false`. The
+   login page still shows "Đăng nhập với Google", greyed out with "Đăng nhập Google
+   chưa được cấu hình" under it; it becomes a working link once `google: true`.
    Look for that log line before debugging anything else.
 
 The FE and API must be served from **one origin** (Vite proxy in dev, a reverse
@@ -139,7 +225,7 @@ email suffix only.
    upper snake case; `Status` goes into the body `code`). Return it, wrapped with
    `wrapAuth(Err…, cause)` when there is a cause worth logging.
 2. Add the user-facing text (Vietnamese) to `MESSAGES` in
-   `workspace/frontend/admin/src/auth/errorMessages.js`. Unknown codes fall back
+   `workspace/frontend/src/auth/errorMessages.js`. Unknown codes fall back
    to a generic message, so the FE won't break if you forget, but the user gets a vague message.
 3. Cover the new code with tests: the backend service test plus a case in
    `LoginPage.test.jsx` (`it.each` over `?error=`).
@@ -200,9 +286,9 @@ cause, and never logs secrets.
 ```bash
 cd workspace/backend
 go test ./component/services/ ./component/handlers/rest/ ./server/
-ECOM_TEST_DATABASE_URL=postgres://…/mq_test?sslmode=disable go test ./component/repositories/ -run TestAuthRepos
+ECOM_TEST_DATABASE_URL=postgres://…/mq_test?sslmode=disable go test ./component/repositories/ -run 'TestAuthRepos|TestRBACRepos|TestOrderQueryRepo'
 
-cd workspace/frontend/admin
+cd workspace/frontend
 npm test && npm run build
 E2E_EMAIL=… E2E_PASSWORD=… npm run e2e        # real backend; after `npx playwright install chromium`
 ```

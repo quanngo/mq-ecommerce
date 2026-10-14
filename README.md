@@ -58,6 +58,23 @@ BACKEND_START_1="go run main.go"
   as the clone folder name, the PM2 process name, and the argument to
   `./start.sh <key>`.
 - `START` is the exact command used to run the project locally.
+- Optional `<TYPE>_DIR_<N>`: folder relative to `workspace/<type>/` to use
+  instead of `<key>`; `.` means `workspace/<type>` itself.
+- `REPO` may be left empty for a project that lives in this repo; setup then
+  skips the clone/pull. This workspace's own `projects.env` does that for
+  both apps:
+
+  ```bash
+  FRONTEND_KEY_1=admin
+  FRONTEND_REPO_1=
+  FRONTEND_DIR_1=.            # workspace/frontend (dev server :8088)
+  FRONTEND_START_1="npm run dev"
+
+  BACKEND_KEY_1=api
+  BACKEND_REPO_1=
+  BACKEND_DIR_1=.             # workspace/backend (:9091)
+  BACKEND_START_1="go run main.go"
+  ```
 
 ## 2. Run setup
 
