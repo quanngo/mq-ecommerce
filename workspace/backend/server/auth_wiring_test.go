@@ -10,19 +10,19 @@ import (
 )
 
 func TestParseCreateUserArgs(t *testing.T) {
-	email, name, pw, err := parseCreateUserArgs([]string{"--email", "an@mq.com", "--name", "An Nguyen", "--password-stdin"}, strings.NewReader("s3cret-pass-1\r\nignored"))
-	if err != nil || email != "an@mq.com" || name != "An Nguyen" || pw == nil || *pw != "s3cret-pass-1" {
-		t.Fatalf("got (%q, %q, %v, %v)", email, name, pw, err)
+	in, err := parseCreateUserArgs([]string{"--email", "an@mq.com", "--name", "An Nguyen", "--role", "admin", "--password-stdin"}, strings.NewReader("s3cret-pass-1\r\nignored"))
+	if err != nil || in.Email != "an@mq.com" || in.DisplayName != "An Nguyen" || in.Role != "admin" || in.Password == nil || *in.Password != "s3cret-pass-1" {
+		t.Fatalf("got (%+v, %v)", in, err)
 	}
 
-	_, _, pw, err = parseCreateUserArgs([]string{"--email", "g@mq.com"}, strings.NewReader("should not be read"))
-	if err != nil || pw != nil {
-		t.Errorf("google-only: pw=%v err=%v (stdin must be ignored without --password-stdin)", pw, err)
+	in, err = parseCreateUserArgs([]string{"--email", "g@mq.com"}, strings.NewReader("should not be read"))
+	if err != nil || in.Password != nil || in.Role != "" {
+		t.Errorf("google-only: %+v err=%v (stdin must be ignored without --password-stdin; role defaults later)", in, err)
 	}
 
-	_, _, pw, err = parseCreateUserArgs([]string{"--email", "a@mq.com", "--password-stdin"}, strings.NewReader("no-newline-at-eof"))
-	if err != nil || pw == nil || *pw != "no-newline-at-eof" {
-		t.Errorf("password without trailing newline: pw=%v err=%v", pw, err)
+	in, err = parseCreateUserArgs([]string{"--email", "a@mq.com", "--password-stdin"}, strings.NewReader("no-newline-at-eof"))
+	if err != nil || in.Password == nil || *in.Password != "no-newline-at-eof" {
+		t.Errorf("password without trailing newline: %+v err=%v", in, err)
 	}
 
 	for name, tc := range map[string]struct {
@@ -35,7 +35,7 @@ func TestParseCreateUserArgs(t *testing.T) {
 		"blank line":    {[]string{"--email", "a@mq.com", "--password-stdin"}, "\n"},
 		"unknown flag":  {[]string{"--email", "a@mq.com", "--password", "inline"}, ""},
 	} {
-		if _, _, _, err := parseCreateUserArgs(tc.args, strings.NewReader(tc.stdin)); err == nil {
+		if _, err := parseCreateUserArgs(tc.args, strings.NewReader(tc.stdin)); err == nil {
 			t.Errorf("%s: expected an error", name)
 		}
 	}

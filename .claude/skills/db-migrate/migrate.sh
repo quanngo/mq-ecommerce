@@ -35,9 +35,36 @@ fi
 [[ -f "$CONFIG" ]] || { echo "error: config not found: $CONFIG (copy application.yml.example)" >&2; exit 1; }
 [[ -d "$MIG_DIR" ]] || { echo "error: no migrations directory at $MIG_DIR" >&2; exit 1; }
 
+# "${VAR}" placeholders are filled like server/config_env.go does: a real
+# environment variable wins, otherwise config/.env (next to the yml), else "".
+# Values are never printed.
+ENV_FILE="$(dirname "$CONFIG")/.env"
+dotenv_get() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  awk -v want="$1" '
+    { sub(/\r$/, ""); sub(/^\xef\xbb\xbf/, ""); line = $0
+      sub(/^[ \t]+/, "", line); if (line == "" || line ~ /^#/) next
+      sub(/^export[ \t]+/, "", line)
+      i = index(line, "="); if (i == 0) next
+      k = substr(line, 1, i - 1); gsub(/[ \t]+$/, "", k); if (k != want) next
+      v = substr(line, i + 1); gsub(/^[ \t]+|[ \t]+$/, "", v)
+      if (length(v) >= 2 && (v ~ /^".*"$/ || v ~ /^'\''.*'\''$/)) v = substr(v, 2, length(v) - 2)
+      print v; exit }' "$ENV_FILE"
+}
+expand_placeholders() {
+  local v="$1" name val n=0
+  while [[ $v =~ \$\{([A-Za-z_][A-Za-z0-9_]*)\} ]] && (( n++ < 20 )); do
+    name="${BASH_REMATCH[1]}"
+    if [[ -n "${!name+x}" ]]; then val="${!name}"; else val="$(dotenv_get "$name")"; fi
+    v="${v//\$\{$name\}/$val}"
+  done
+  printf '%s' "$v"
+}
+
 # Read the top-level `database:` block the way the app's YAML decoder does:
 # drop a trailing " #comment" and one pair of surrounding quotes.
 while IFS='=' read -r k v; do
+  v="$(expand_placeholders "$v")"
   case "$k" in
     host) export PGHOST="$v" ;;
     port) export PGPORT="$v" ;;

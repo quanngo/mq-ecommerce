@@ -37,8 +37,18 @@ type AuthService interface {
 	Logout(ctx context.Context, rawToken string) error
 	LogoutAll(ctx context.Context, userID int64) (int64, error)
 
+	// ChangePassword changes the signed-in user's own password and signs out
+	// their other sessions (this one stays).
+	ChangePassword(ctx context.Context, user *models.SessionUser, currentPassword, newPassword string) error
+
 	CreateUser(ctx context.Context, in CreateUserInput) (int64, error)
 	CleanupAuthSessions()
+	// HashNewPassword applies the password policy and returns a bcrypt hash
+	// (ErrWeakPassword if the password is too short or too long).
+	HashNewPassword(pw string) (string, error)
+	// WarnIfDefaultAdminPassword logs a warning while the seeded admin still
+	// uses the default password from migrations/004.
+	WarnIfDefaultAdminPassword(ctx context.Context)
 }
 
 type GoogleCallbackInput struct {
@@ -59,15 +69,18 @@ type CreateUserInput struct {
 	Email       string
 	DisplayName string
 	Password    *string // nil = Google-only account
+	Role        string  // role code; "" = auth.default-role
 }
 
 type userStore interface {
 	GetByEmail(ctx context.Context, email string) (*models.AppUser, error)
 	GetByGoogleSub(ctx context.Context, sub string) (*models.AppUser, error)
-	Create(ctx context.Context, u models.AppUser) (int64, error)
+	GetByID(ctx context.Context, id int64) (*models.AppUser, error)
+	Create(ctx context.Context, u models.AppUser, roleCode string) (int64, error)
 	LinkGoogle(ctx context.Context, userID int64, sub, displayName string, avatarURL *string) (bool, error)
 	RecordLoginFailure(ctx context.Context, userID int64, maxFailed int, lockFor time.Duration) (int, *time.Time, error)
 	MarkLoginSuccess(ctx context.Context, userID int64) (time.Time, error)
+	SetPassword(ctx context.Context, userID int64, hash string) error
 }
 
 type sessionStore interface {
@@ -75,6 +88,7 @@ type sessionStore interface {
 	GetValid(ctx context.Context, tokenHash string) (*models.SessionUser, error)
 	Revoke(ctx context.Context, tokenHash string) error
 	RevokeAllForUser(ctx context.Context, userID int64) (int64, error)
+	RevokeAllForUserExcept(ctx context.Context, userID int64, keepHash string) (int64, error)
 	DeleteStale(ctx context.Context, grace time.Duration) (int64, error)
 }
 
@@ -86,9 +100,12 @@ type loginAttemptStore interface {
 
 const (
 	defaultRedirectPath = "/profile"
-	minPasswordLen      = 10
 	maxPasswordLen      = 72 // bcrypt ignores anything past 72 bytes
 	sessionCleanupGrace = 24 * time.Hour
+
+	// Seeded by migrations/004_rbac_and_default_admin.sql.
+	DefaultAdminEmail    = "admin@mq.com"
+	defaultAdminPassword = "123456"
 )
 
 type AuthServiceImpl struct {
@@ -227,36 +244,32 @@ func (s *AuthServiceImpl) resolveGoogleUser(ctx context.Context, email string, c
 		if err != nil {
 			return nil, wrapAuth(ErrInternal, err)
 		}
-		switch {
-		case user != nil:
-			linked, err := s.users.LinkGoogle(ctx, user.ID, c.Sub, c.Name, avatar)
-			if err != nil {
-				return nil, wrapAuth(ErrInternal, err)
+		if user == nil {
+			if !s.cfg.Google.AutoProvision {
+				return nil, wrapAuth(ErrUserNotAllowed, fmt.Errorf("no app_user for %s", email))
 			}
-			if !linked {
-				return nil, wrapAuth(ErrUserNotAllowed, fmt.Errorf("user_id=%d already linked to another Google account", user.ID))
-			}
-		case s.cfg.Google.AutoProvision:
 			sub := c.Sub
 			id, err := s.users.Create(ctx, models.AppUser{
 				Email: email, DisplayName: c.Name, AvatarURL: avatar, GoogleSub: &sub, Status: models.UserStatusActive,
-			})
+			}, s.cfg.DefaultRole)
 			if err != nil {
 				return nil, wrapAuth(ErrInternal, fmt.Errorf("auto-provision %s: %w", email, err))
 			}
-			utils.ShowInfoLogs("[AuthServiceImpl] [CompleteGoogleLogin] auto-provisioned user_id=%d email=%s", id, email)
-			user = &models.AppUser{ID: id, Email: email, DisplayName: c.Name, AvatarURL: avatar, GoogleSub: &sub, Status: models.UserStatusActive}
-		default:
-			return nil, wrapAuth(ErrUserNotAllowed, fmt.Errorf("no app_user for %s", email))
+			utils.ShowInfoLogs("[AuthServiceImpl] [CompleteGoogleLogin] auto-provisioned user_id=%d email=%s role=%s", id, email, s.cfg.DefaultRole)
+			return &models.AppUser{ID: id, Email: email, DisplayName: c.Name, AvatarURL: avatar, GoogleSub: &sub, Status: models.UserStatusActive}, nil
 		}
 	}
 	if user.Status != models.UserStatusActive {
 		return nil, wrapAuth(ErrUserNotAllowed, fmt.Errorf("user_id=%d is %s", user.ID, user.Status))
 	}
-	if c.Name != "" && user.DisplayName == "" {
-		user.DisplayName = c.Name
+	// Pins the sub on first Google login and refreshes name/avatar every time.
+	linked, err := s.users.LinkGoogle(ctx, user.ID, c.Sub, c.Name, avatar)
+	if err != nil {
+		return nil, wrapAuth(ErrInternal, err)
 	}
-	user.AvatarURL = avatar
+	if !linked {
+		return nil, wrapAuth(ErrUserNotAllowed, fmt.Errorf("user_id=%d already linked to another Google account", user.ID))
+	}
 	return user, nil
 }
 
@@ -347,11 +360,20 @@ func (s *AuthServiceImpl) startSession(ctx context.Context, user models.AppUser,
 	if err := s.sessions.Create(ctx, hash, user.ID, method, expiresAt, truncate(meta.UserAgent, 512), truncate(meta.IP, 64)); err != nil {
 		return nil, wrapAuth(ErrInternal, fmt.Errorf("create session: %w", err))
 	}
+	// Read the session back: the same query RequireAuth uses, so the login
+	// response carries exactly the role and permissions later requests get.
+	sessionUser, err := s.sessions.GetValid(ctx, hash)
+	if err != nil {
+		return nil, wrapAuth(ErrInternal, fmt.Errorf("load new session: %w", err))
+	}
+	if sessionUser == nil {
+		return nil, wrapAuth(ErrInternal, errors.New("new session not readable"))
+	}
 	return &models.NewSession{
 		Token:      token,
 		ExpiresAt:  expiresAt,
 		Persistent: meta.RememberMe,
-		User:       models.SessionUser{AppUser: user, AuthMethod: method, TokenHash: hash},
+		User:       *sessionUser,
 	}, nil
 }
 
@@ -399,22 +421,82 @@ func (s *AuthServiceImpl) CreateUser(ctx context.Context, in CreateUserInput) (i
 	}
 	u := models.AppUser{Email: email, DisplayName: strings.TrimSpace(in.DisplayName), Status: models.UserStatusActive}
 	if in.Password != nil {
-		pw := *in.Password
-		if len(pw) < minPasswordLen || len(pw) > maxPasswordLen {
-			return 0, fmt.Errorf("password must be %d-%d bytes", minPasswordLen, maxPasswordLen)
-		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(pw), s.bcryptCost)
+		hash, err := s.HashNewPassword(*in.Password)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("password must be %d-%d bytes", s.cfg.MinPasswordLength, maxPasswordLen)
 		}
-		h := string(hash)
-		u.PasswordHash = &h
+		u.PasswordHash = &hash
 	}
-	id, err := s.users.Create(ctx, u)
-	if errors.Is(err, repositories.ErrDuplicateEmail) {
+	role := in.Role
+	if role == "" {
+		role = s.cfg.DefaultRole
+	}
+	id, err := s.users.Create(ctx, u, role)
+	switch {
+	case errors.Is(err, repositories.ErrDuplicateEmail):
 		return 0, fmt.Errorf("a user with email %s already exists", email)
+	case errors.Is(err, repositories.ErrUnknownRole):
+		return 0, fmt.Errorf("unknown role %q", role)
 	}
 	return id, err
+}
+
+// HashNewPassword applies the password policy (auth.min-password-length up to
+// bcrypt's 72 bytes) and returns the bcrypt hash; ErrWeakPassword otherwise.
+func (s *AuthServiceImpl) HashNewPassword(pw string) (string, error) {
+	if len(pw) < s.cfg.MinPasswordLength || len(pw) > maxPasswordLen {
+		return "", ErrWeakPassword
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(pw), s.bcryptCost)
+	if err != nil {
+		return "", wrapAuth(ErrInternal, err)
+	}
+	return string(hash), nil
+}
+
+func (s *AuthServiceImpl) ChangePassword(ctx context.Context, actor *models.SessionUser, currentPassword, newPassword string) error {
+	if actor == nil {
+		return ErrUnauthenticated
+	}
+	user, err := s.users.GetByID(ctx, actor.ID)
+	if err != nil {
+		return wrapAuth(ErrInternal, err)
+	}
+	if user == nil {
+		return ErrUnauthenticated
+	}
+	// A Google-only account (no password yet) may set its first password;
+	// otherwise the current one is required, so a hijacked session alone
+	// can't take over the account's password login.
+	if user.PasswordHash != nil && bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(currentPassword)) != nil {
+		return ErrWrongPassword
+	}
+	if currentPassword != "" && currentPassword == newPassword {
+		return ErrWeakPassword
+	}
+	hash, err := s.HashNewPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.users.SetPassword(ctx, user.ID, hash); err != nil {
+		return wrapAuth(ErrInternal, err)
+	}
+	n, err := s.sessions.RevokeAllForUserExcept(ctx, user.ID, actor.TokenHash)
+	if err != nil {
+		return wrapAuth(ErrInternal, err)
+	}
+	utils.ShowInfoLogs("[AuthServiceImpl] [ChangePassword] user_id=%d other_sessions_revoked=%d", user.ID, n)
+	return nil
+}
+
+func (s *AuthServiceImpl) WarnIfDefaultAdminPassword(ctx context.Context) {
+	user, err := s.users.GetByEmail(ctx, DefaultAdminEmail)
+	if err != nil || user == nil || user.PasswordHash == nil || user.Status != models.UserStatusActive {
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(defaultAdminPassword)) == nil {
+		utils.ShowErrorLogs(fmt.Errorf("[SECURITY] %s still uses the default password from migrations/004: change it now (Profile -> Đổi mật khẩu)", DefaultAdminEmail))
+	}
 }
 
 // CleanupAuthSessions is the cleanupAuthSessions worker.

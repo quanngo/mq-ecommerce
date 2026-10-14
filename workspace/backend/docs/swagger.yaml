@@ -1,54 +1,585 @@
 basePath: /api
+definitions:
+  main_component_models.OrderDetailResponse:
+    properties:
+      order:
+        $ref: '#/definitions/models.OrderDetail'
+    type: object
+  main_component_models.OrderItem:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      price:
+        type: number
+      quantity:
+        type: integer
+      sku:
+        type: string
+    type: object
+  models.AuthMethod:
+    enum:
+    - google
+    - password
+    type: string
+    x-enum-varnames:
+    - AuthMethodGoogle
+    - AuthMethodPassword
+  models.ChangePasswordRequest:
+    properties:
+      current_password:
+        maxLength: 256
+        type: string
+      new_password:
+        maxLength: 256
+        type: string
+    required:
+    - new_password
+    type: object
+  models.CreateUserRequest:
+    properties:
+      display_name:
+        maxLength: 255
+        type: string
+      email:
+        maxLength: 320
+        type: string
+      password:
+        description: omitted = Google-only account
+        maxLength: 256
+        type: string
+      role:
+        maxLength: 64
+        type: string
+    required:
+    - email
+    - role
+    type: object
+  models.LogoutAllResponse:
+    properties:
+      revoked_sessions:
+        type: integer
+    type: object
+  models.ManagedUser:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      google_linked:
+        type: boolean
+      has_password:
+        type: boolean
+      id:
+        type: integer
+      last_login_at:
+        type: string
+      locked_until:
+        type: string
+      role:
+        $ref: '#/definitions/models.RoleRef'
+      status:
+        $ref: '#/definitions/models.UserStatus'
+    type: object
+  models.OrderDetail:
+    properties:
+      address:
+        type: string
+      comment:
+        type: string
+      created_at:
+        type: string
+      customer_name:
+        type: string
+      discount:
+        type: number
+      district:
+        type: string
+      do_status:
+        type: string
+      id:
+        type: integer
+      item_count:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/main_component_models.OrderItem'
+        type: array
+      lead_status:
+        type: integer
+      market_place:
+        type: string
+      neighborhood:
+        type: string
+      order_id:
+        type: string
+      payment_method:
+        type: integer
+      phone:
+        type: string
+      province:
+        type: string
+      shipping_fee:
+        type: number
+      shipping_label:
+        type: string
+      shop_id:
+        type: string
+      so_status:
+        type: integer
+      sub_district:
+        type: string
+      total_amount:
+        type: number
+      tracking_code:
+        type: string
+      updated_at:
+        type: string
+      warehouse:
+        type: string
+    type: object
+  models.OrderListResponse:
+    properties:
+      orders:
+        items:
+          $ref: '#/definitions/models.OrderSummary'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  models.OrderSummary:
+    properties:
+      created_at:
+        type: string
+      customer_name:
+        type: string
+      do_status:
+        type: string
+      id:
+        type: integer
+      item_count:
+        type: integer
+      lead_status:
+        type: integer
+      market_place:
+        type: string
+      order_id:
+        type: string
+      payment_method:
+        type: integer
+      phone:
+        type: string
+      shop_id:
+        type: string
+      so_status:
+        type: integer
+      total_amount:
+        type: number
+      tracking_code:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.PasswordLoginRequest:
+    properties:
+      email:
+        maxLength: 320
+        type: string
+      password:
+        maxLength: 256
+        type: string
+      remember_me:
+        type: boolean
+    required:
+    - email
+    - password
+    type: object
+  models.ProvidersResponse:
+    properties:
+      google:
+        type: boolean
+      password:
+        type: boolean
+    type: object
+  models.ResetPasswordRequest:
+    properties:
+      password:
+        maxLength: 256
+        type: string
+    required:
+    - password
+    type: object
+  models.Role:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      is_system:
+        type: boolean
+      name:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+    type: object
+  models.RoleRef:
+    properties:
+      code:
+        type: string
+      name:
+        type: string
+    type: object
+  models.RolesListResponse:
+    properties:
+      roles:
+        items:
+          $ref: '#/definitions/models.Role'
+        type: array
+    type: object
+  models.UpdateUserRequest:
+    properties:
+      display_name:
+        maxLength: 255
+        type: string
+      role:
+        maxLength: 64
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.UserStatus'
+        enum:
+        - active
+        - disabled
+    type: object
+  models.UserResponse:
+    properties:
+      auth_method:
+        $ref: '#/definitions/models.AuthMethod'
+      avatar_url:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      last_login_at:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+      role:
+        $ref: '#/definitions/models.RoleRef'
+    type: object
+  models.UserStatus:
+    enum:
+    - active
+    - disabled
+    type: string
+    x-enum-varnames:
+    - UserStatusActive
+    - UserStatusDisabled
+  models.UsersListResponse:
+    properties:
+      users:
+        items:
+          $ref: '#/definitions/models.ManagedUser'
+        type: array
+    type: object
 host: localhost:9091
 info:
   contact:
     email: ngonguyenminhquan@gmail.com
     name: Quan Ngo
-  description: This is a sample document for API.
+  description: |-
+    Backend of the MQ e-commerce admin app (marketplace order sync, login, users, orders).
+
+    Every JSON endpoint answers HTTP 200 with the envelope {code, message, data}: `code` is the real status, `message` the error code on failure (e.g. UNAUTHENTICATED, FORBIDDEN), and `data` is an array whose first element is the documented response model.
+
+    Auth: sign in with POST /v1/auth/login (or the Google flow), which sets the httpOnly `ecom_session` cookie; send it with every request. State-changing calls must come from the frontend origin (Origin header checked). Required permissions per route: see workspace/backend/API_DOCUMENT.md.
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   termsOfService: http://swagger.io/terms/
-  title: MQ Document API
+  title: MQ E-commerce Admin API
   version: "1.0"
 paths:
-  /v1/lazada/lazadareadytoship:
+  /v1/auth/change-password:
     post:
       consumes:
       - application/json
-      description: Receive webhook from Lazada
+      parameters:
+      - description: passwords
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChangePasswordRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
-      summary: Lazada Webhook
+      summary: Change your own password (current password required if you have one);
+        signs out your other sessions
       tags:
-      - webhook
-  /v1/lazada/webhook:
+      - auth
+  /v1/auth/google/callback:
+    get:
+      responses:
+        "302":
+          description: Found
+      summary: 'Google redirect target: sets the session cookie and 302s to the FE'
+      tags:
+      - auth
+  /v1/auth/google/login:
+    get:
+      parameters:
+      - description: FE path to return to after login
+        in: query
+        name: next
+        type: string
+      - description: 1 = remember me (long session, persistent cookie)
+        in: query
+        name: remember
+        type: string
+      responses:
+        "302":
+          description: Found
+      summary: Start Google sign-in (302 to Google)
+      tags:
+      - auth
+  /v1/auth/login:
     post:
       consumes:
       - application/json
-      description: Receive webhook from Lazada
+      parameters:
+      - description: credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PasswordLoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
-      summary: Lazada Webhook
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+      summary: Sign in with an internal email and password
       tags:
-      - webhook
-  /v1/tiktok/webhook:
+      - auth
+  /v1/auth/logout:
     post:
-      consumes:
-      - application/json
-      description: Receive webhook from TiktokShop
       produces:
       - application/json
       responses:
         "200":
           description: OK
-      summary: TiktokShop Webhook
+      summary: Revoke the current session and clear the cookie
       tags:
-      - webhook
+      - auth
+  /v1/auth/logout-all:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LogoutAllResponse'
+      summary: Revoke every session of the signed-in user (all devices) and clear
+        this cookie
+      tags:
+      - auth
+  /v1/auth/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+      summary: The signed-in user
+      tags:
+      - auth
+  /v1/auth/providers:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProvidersResponse'
+      summary: Login methods that are currently available
+      tags:
+      - auth
+  /v1/orders:
+    get:
+      parameters:
+      - description: order_id, tracking_code, customer name or phone (contains)
+        in: query
+        name: q
+        type: string
+      - description: Tiktok | Lazada | Shopee
+        in: query
+        name: market_place
+        type: string
+      - description: 1-4 (utils.LeadStatus)
+        in: query
+        name: lead_status
+        type: integer
+      - description: created from, YYYY-MM-DD (Vietnam time, inclusive)
+        in: query
+        name: from
+        type: string
+      - description: created to, YYYY-MM-DD (Vietnam time, inclusive)
+        in: query
+        name: to
+        type: string
+      - description: default 1
+        in: query
+        name: page
+        type: integer
+      - description: 1-100, default 20
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.OrderListResponse'
+      summary: Orders, newest first, filtered and paginated
+      tags:
+      - orders
+  /v1/orders/{id}:
+    get:
+      parameters:
+      - description: ecom_order id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main_component_models.OrderDetailResponse'
+      summary: One order with its items
+      tags:
+      - orders
+  /v1/roles:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.RolesListResponse'
+      summary: Roles and their permissions
+      tags:
+      - users
+  /v1/users:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UsersListResponse'
+      summary: All users (user management)
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: new user
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ManagedUser'
+      summary: 'Create a user (password optional: without it the account is Google-only)'
+      tags:
+      - users
+  /v1/users/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: user id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ManagedUser'
+      summary: Change a user's name, role or status (active/disabled)
+      tags:
+      - users
+  /v1/users/{id}/reset-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: user id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Set a new password for another user and sign them out everywhere
+      tags:
+      - users
 swagger: "2.0"

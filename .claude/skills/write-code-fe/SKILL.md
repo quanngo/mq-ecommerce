@@ -1,6 +1,6 @@
 ---
 name: write-code-fe
-description: Implement a feature on the frontend only, in the admin app (workspace/frontend/admin, React 18 + Vite, plain JavaScript/JSX, not TypeScript). Read the app's conventions and the existing backend API contract it will call, ask the developer about anything ambiguous, build the page/route/components, wire them to the real backend endpoints through src/api, add Vitest + MSW tests and, where it fits, a Playwright e2e spec. Does not modify backend code. Use when asked to build or change UI on the frontend only, or when the backend API already exists.
+description: Implement a feature on the frontend only, in the admin app (workspace/frontend, React 18 + Vite, plain JavaScript/JSX, not TypeScript). Read the app's conventions and the existing backend API contract it will call, ask the developer about anything ambiguous, build the page/route/components, wire them to the real backend endpoints through src/api, add Vitest + MSW tests and, where it fits, a Playwright e2e spec. Does not modify backend code. Use when asked to build or change UI on the frontend only, or when the backend API already exists.
 ---
 
 Implement a feature on the **frontend only**, grounded in what the code
@@ -11,7 +11,7 @@ use. Ask the developer rather than guess. This skill never writes backend code.
 
 1. **Restate the requirement** in your own words as a first check that you understood it.
 
-2. **Read the frontend.** Read `workspace/frontend/admin/CLAUDE.md` first (stack,
+2. **Read the frontend.** Read `workspace/frontend/CLAUDE.md` first (stack,
    layout, conventions, tests), then the files you'll touch. The project is
    **plain JavaScript (`.js`/`.jsx`)**:
    - never add TypeScript, `tsconfig`, or `.ts`/`.tsx` files;
@@ -80,7 +80,7 @@ use. Ask the developer rather than guess. This skill never writes backend code.
     the env vars it needs are missing. Say in the report that this covers the
     frontend side only.
 
-11. **Verify, then report.** From `workspace/frontend/admin/` run
+11. **Verify, then report.** From `workspace/frontend/` run
     `npm test && npm run build`, and quote the real result. On Windows, Node is
     at `C:\Program Files\nodejs`, so refresh `PATH` if `node` isn't found. If you
     didn't run e2e, say so. Then summarise:

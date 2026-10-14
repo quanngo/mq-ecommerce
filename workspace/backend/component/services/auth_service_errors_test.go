@@ -34,11 +34,11 @@ func (f *failingUsers) GetByGoogleSub(ctx context.Context, s string) (*models.Ap
 	}
 	return f.fakeUsers.GetByGoogleSub(ctx, s)
 }
-func (f *failingUsers) Create(ctx context.Context, u models.AppUser) (int64, error) {
+func (f *failingUsers) Create(ctx context.Context, u models.AppUser, role string) (int64, error) {
 	if f.create != nil {
 		return 0, f.create
 	}
-	return f.fakeUsers.Create(ctx, u)
+	return f.fakeUsers.Create(ctx, u, role)
 }
 func (f *failingUsers) LinkGoogle(ctx context.Context, id int64, sub, name string, a *string) (bool, error) {
 	if f.link != nil {
@@ -296,7 +296,9 @@ func TestSessionStoreFailures(t *testing.T) {
 
 func TestSessionTTLFromConfig(t *testing.T) {
 	h := newHarness(t, utils.AuthConfig{SessionTTLHours: 2}, pwUser(t))
-	fixed := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	// The fake session store checks expiry against the wall clock, so the
+	// service clock must be "now" too (a fixed past date expires the session).
+	fixed := time.Now().UTC().Truncate(time.Second)
 	h.svc.now = func() time.Time { return fixed }
 	sess, err := h.svc.LoginWithPassword(context.Background(), "an.nguyen@mq.com", "correct-horse-1", ClientMeta{})
 	if err != nil {

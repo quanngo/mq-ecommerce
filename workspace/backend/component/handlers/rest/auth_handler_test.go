@@ -32,6 +32,9 @@ type fakeAuthSvc struct {
 	logoutAllFor int64
 	logoutAllErr error
 	redirectPath string
+	sessionUser  *models.SessionUser // returned by Authenticate; nil = testUser
+	changeErr    error
+	gotChange    [2]string // current, new
 }
 
 var testUser = models.SessionUser{
@@ -67,6 +70,9 @@ func (f *fakeAuthSvc) LogoutAll(_ context.Context, userID int64) (int64, error) 
 }
 func (f *fakeAuthSvc) Authenticate(_ context.Context, token string) (*models.SessionUser, error) {
 	if token != "" && token == f.validToken {
+		if f.sessionUser != nil {
+			return f.sessionUser, nil
+		}
 		u := testUser
 		return &u, nil
 	}
@@ -80,6 +86,13 @@ func (f *fakeAuthSvc) CreateUser(context.Context, services.CreateUserInput) (int
 	return 0, nil
 }
 func (f *fakeAuthSvc) CleanupAuthSessions() {}
+
+func (f *fakeAuthSvc) ChangePassword(_ context.Context, _ *models.SessionUser, current, next string) error {
+	f.gotChange = [2]string{current, next}
+	return f.changeErr
+}
+func (f *fakeAuthSvc) HashNewPassword(pw string) (string, error)  { return "hash:" + pw, nil }
+func (f *fakeAuthSvc) WarnIfDefaultAdminPassword(context.Context) {}
 
 func newTestRouter(svc services.AuthService, secure bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)

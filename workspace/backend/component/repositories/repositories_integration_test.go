@@ -10,6 +10,7 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"main/component/models"
 	tiktok_model "main/component/models/tiktok_model"
@@ -120,6 +121,88 @@ func TestEcomOrderRepo(t *testing.T) {
 	// By tracking_code when there is no order_id.
 	if n, err := repo.UpdateDOStatus(ctx, models.UpdateDOStatusRequest{TrackingCode: "SHEET2", Status: "delivered"}); err != nil || n != 1 {
 		t.Fatalf("UpdateDOStatus(tracking) = %d, %v; want 1", n, err)
+	}
+}
+
+func TestOrderQueryRepo(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	writer, repo := NewEcomOrderRepo(db), NewOrderQueryRepo(db)
+
+	seed := []models.CreateEcommerceRequest{
+		{MarketPlace: utils.TikTok, OrderID: "TT-1", TrackingCode: "TRK-A", Name: "Nguyễn Văn An", Phone: "0901111111", Status: utils.LeadCreated, TotalAmount: 398,
+			Address: "1 Lê Lợi", Province: "HCM", DisCount: 10, ShippingFee: 15,
+			Products: []models.ConnectorProduct{{Name: "Serum", Sku: "SR-01", Quantity: 2, Price: 199}, {Name: "Toner", Sku: "TN-01", Quantity: 1, Price: 0}}},
+		{MarketPlace: utils.Lazada, OrderID: "LZ-2", Name: "Trần Thị Bình", Phone: "0902222222", Status: utils.LeadCancel},
+		{MarketPlace: utils.Lazada, OrderID: "LZ_100%", Name: "Lê C", Phone: "0903333333", Status: utils.LeadCreated},
+	}
+	for _, o := range seed {
+		if created, err := writer.CreateOrder(ctx, 1, o); err != nil || !created {
+			t.Fatalf("seed %s: %v, %v", o.OrderID, created, err)
+		}
+	}
+	// Spread creation dates: TT-1 on Oct 1, LZ-2 on Oct 10, LZ_100% on Oct 14 (Vietnam time).
+	mustExec(t, db, `UPDATE public.ecom_order SET created_at = '2026-10-01 09:00+07' WHERE order_id = 'TT-1'`)
+	mustExec(t, db, `UPDATE public.ecom_order SET created_at = '2026-10-10 23:30+07' WHERE order_id = 'LZ-2'`)
+	mustExec(t, db, `UPDATE public.ecom_order SET created_at = '2026-10-14 08:00+07' WHERE order_id = 'LZ_100%'`)
+
+	vn := time.FixedZone("ICT", 7*3600)
+	day := func(d int) *time.Time { t := time.Date(2026, 10, d, 0, 0, 0, 0, vn); return &t }
+	ids := func(list []models.OrderSummary) string {
+		var s []string
+		for _, o := range list {
+			s = append(s, o.OrderID)
+		}
+		return strings.Join(s, ",")
+	}
+
+	cases := []struct {
+		name  string
+		f     models.OrderFilter
+		want  string
+		total int
+	}{
+		{"all, newest first", models.OrderFilter{Limit: 20}, "LZ_100%,LZ-2,TT-1", 3},
+		{"page 2 of size 2", models.OrderFilter{Limit: 2, Offset: 2}, "TT-1", 3},
+		{"market place", models.OrderFilter{MarketPlace: "Lazada", Limit: 20}, "LZ_100%,LZ-2", 2},
+		{"lead status", models.OrderFilter{LeadStatus: int(utils.LeadCancel), Limit: 20}, "LZ-2", 1},
+		{"search phone", models.OrderFilter{Q: "0902", Limit: 20}, "LZ-2", 1},
+		{"search name, case-insensitive", models.OrderFilter{Q: "nguyễn văn", Limit: 20}, "TT-1", 1},
+		{"search tracking code", models.OrderFilter{Q: "trk-a", Limit: 20}, "TT-1", 1},
+		{"like wildcards are literal", models.OrderFilter{Q: "_100%", Limit: 20}, "LZ_100%", 1},
+		{"underscore is not a wildcard", models.OrderFilter{Q: "LZ_2", Limit: 20}, "", 0},
+		{"date range", models.OrderFilter{CreatedFrom: day(10), CreatedTo: day(11), Limit: 20}, "LZ-2", 1},
+		{"combined", models.OrderFilter{MarketPlace: "Lazada", CreatedFrom: day(11), Q: "0903", Limit: 20}, "LZ_100%", 1},
+	}
+	for _, tc := range cases {
+		list, total, err := repo.List(ctx, tc.f)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if got := ids(list); got != tc.want || total != tc.total {
+			t.Errorf("%s: got %q (total %d), want %q (total %d)", tc.name, got, total, tc.want, tc.total)
+		}
+	}
+
+	list, _, _ := repo.List(ctx, models.OrderFilter{Q: "TT-1", Limit: 20})
+	if len(list) != 1 || list[0].ItemCount != 2 || list[0].TotalAmount != 398 || list[0].SoStatus != nil {
+		t.Fatalf("summary = %+v", list)
+	}
+
+	detail, err := repo.Get(ctx, list[0].ID)
+	if err != nil || detail == nil {
+		t.Fatalf("Get = %+v, %v", detail, err)
+	}
+	if detail.OrderID != "TT-1" || detail.Address != "1 Lê Lợi" || detail.Discount != 10 || detail.ShippingFee != 15 ||
+		len(detail.Items) != 2 || detail.Items[0].Sku != "SR-01" || detail.Items[0].Price != 199 {
+		t.Errorf("detail = %+v", detail)
+	}
+	if missing, err := repo.Get(ctx, 999999); err != nil || missing != nil {
+		t.Errorf("Get(missing) = %+v, %v; want nil, nil", missing, err)
+	}
+	other, _, _ := repo.List(ctx, models.OrderFilter{Q: "LZ-2", Limit: 20})
+	if d, _ := repo.Get(ctx, other[0].ID); d == nil || d.Items == nil || len(d.Items) != 0 {
+		t.Errorf("order without items: %+v (items must be [] not nil)", d)
 	}
 }
 
@@ -273,14 +356,14 @@ func TestAuthRepos(t *testing.T) {
 	users, sessions, attempts := NewUserRepo(db), NewSessionRepo(db), NewLoginAttemptRepo(db)
 
 	hash := "$2a$04$abcdefghijklmnopqrstuuQ6v4bCw2b0mM9w1V9yQkq4m7vN3o1aS"
-	id, err := users.Create(ctx, models.AppUser{Email: "an.nguyen@mq.com", DisplayName: "", PasswordHash: &hash})
+	id, err := users.Create(ctx, models.AppUser{Email: "an.nguyen@mq.com", DisplayName: "", PasswordHash: &hash}, "")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if _, err := users.Create(ctx, models.AppUser{Email: "an.nguyen@mq.com"}); err != ErrDuplicateEmail {
+	if _, err := users.Create(ctx, models.AppUser{Email: "an.nguyen@mq.com"}, ""); err != ErrDuplicateEmail {
 		t.Errorf("duplicate email: %v, want ErrDuplicateEmail", err)
 	}
-	if _, err := users.Create(ctx, models.AppUser{Email: "Upper@mq.com"}); err == nil {
+	if _, err := users.Create(ctx, models.AppUser{Email: "Upper@mq.com"}, ""); err == nil {
 		t.Error("mixed-case email accepted; ck_app_user_email_lc missing?")
 	}
 	u, err := users.GetByEmail(ctx, "an.nguyen@mq.com")
@@ -338,7 +421,8 @@ func TestAuthRepos(t *testing.T) {
 	if su, _ := sessions.GetValid(ctx, valid); su != nil {
 		t.Error("revoked session returned")
 	}
-	mustExec(t, db, `UPDATE public.user_session SET revoked_at = NOW() - interval '2 days'`)
+	// Only the revoked session: the expired "b" one is less than a day past expiry and must stay.
+	mustExec(t, db, `UPDATE public.user_session SET revoked_at = NOW() - interval '2 days' WHERE token_hash = $1`, valid)
 	if n, err := sessions.DeleteStale(ctx, 24*time.Hour); err != nil || n != 1 {
 		t.Errorf("DeleteStale = %d, %v; want 1 (the long-revoked one)", n, err)
 	}
@@ -374,8 +458,8 @@ func TestAuthRepos_RememberMeAndRevokeAll(t *testing.T) {
 		t.Fatalf("remember_me not round-tripped: %+v, %v", a, err)
 	}
 
-	id1, _ := users.Create(ctx, models.AppUser{Email: "a@mq.com"})
-	id2, _ := users.Create(ctx, models.AppUser{Email: "b@mq.com"})
+	id1, _ := users.Create(ctx, models.AppUser{Email: "a@mq.com"}, "")
+	id2, _ := users.Create(ctx, models.AppUser{Email: "b@mq.com"}, "")
 	exp := time.Now().Add(time.Hour)
 	hashes := []string{strings.Repeat("c", 64), strings.Repeat("d", 64), strings.Repeat("e", 64), strings.Repeat("f", 64)}
 	for i, uid := range []int64{id1, id1, id1, id2} {
@@ -390,5 +474,85 @@ func TestAuthRepos_RememberMeAndRevokeAll(t *testing.T) {
 	}
 	if su, _ := sessions.GetValid(ctx, hashes[3]); su == nil || su.ID != id2 {
 		t.Error("another user's session was revoked")
+	}
+}
+
+func TestRBACRepos(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	users, sessions, roles := NewUserRepo(db), NewSessionRepo(db), NewRoleRepo(db)
+
+	list, err := roles.List(ctx)
+	if err != nil || len(list) < 3 {
+		t.Fatalf("roles = %+v, %v (is migration 004 applied?)", list, err)
+	}
+	perms := map[string][]string{}
+	for _, r := range list {
+		perms[r.Code] = r.Permissions
+	}
+	// 004 seeds four permissions; 005 adds orders.detail to every seeded role.
+	if len(perms["admin"]) != 5 || len(perms["operator"]) != 3 || len(perms["viewer"]) != 2 {
+		t.Errorf("seeded permissions = %v (are migrations 004 and 005 applied?)", perms)
+	}
+
+	adminID, err := users.Create(ctx, models.AppUser{Email: "boss@mq.com"}, "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewerID, _ := users.Create(ctx, models.AppUser{Email: "v@mq.com"}, "")
+	if _, err := users.Create(ctx, models.AppUser{Email: "x@mq.com"}, "superuser"); err != ErrUnknownRole {
+		t.Errorf("unknown role on create: %v", err)
+	}
+
+	// Session carries role + permissions.
+	hash := strings.Repeat("a", 64)
+	sessions.Create(ctx, hash, adminID, models.AuthMethodPassword, time.Now().Add(time.Hour), "", "")
+	su, err := sessions.GetValid(ctx, hash)
+	if err != nil || su == nil || su.RoleCode != "admin" || !su.Can(models.PermUsersManage) {
+		t.Fatalf("GetValid = %+v, %v", su, err)
+	}
+
+	// Managed list / update.
+	all, err := users.List(ctx)
+	if err != nil || len(all) != 2 || all[0].Role.Code == "" {
+		t.Fatalf("List = %+v, %v", all, err)
+	}
+	role := "operator"
+	if err := users.Update(ctx, viewerID, UserUpdate{RoleCode: &role}); err != nil {
+		t.Fatal(err)
+	}
+	bad := "superuser"
+	if err := users.Update(ctx, viewerID, UserUpdate{RoleCode: &bad}); err != ErrUnknownRole {
+		t.Errorf("unknown role on update: %v", err)
+	}
+	if err := users.Update(ctx, 999999, UserUpdate{RoleCode: &role}); err != sql.ErrNoRows {
+		t.Errorf("missing user: %v", err)
+	}
+	if m, _ := users.GetManaged(ctx, viewerID); m == nil || m.Role.Code != "operator" {
+		t.Errorf("after update: %+v", m)
+	}
+
+	if n, err := users.CountActiveWithPermission(ctx, models.PermUsersManage, 0); err != nil || n != 1 {
+		t.Errorf("managers = %d, %v", n, err)
+	}
+	if n, _ := users.CountActiveWithPermission(ctx, models.PermUsersManage, adminID); n != 0 {
+		t.Errorf("managers excluding the admin = %d", n)
+	}
+
+	// Lockout restarts after expiry.
+	mustExec(t, db, `UPDATE public.app_user SET failed_login_count = 5, locked_until = NOW() - interval '1 minute' WHERE id = $1`, viewerID)
+	if count, locked, err := users.RecordLoginFailure(ctx, viewerID, 5, 15*time.Minute); err != nil || count != 1 || locked != nil {
+		t.Errorf("after expired lock: count=%d locked=%v err=%v; want 1, nil", count, locked, err)
+	}
+
+	// Password change keeps one session.
+	keep, drop := strings.Repeat("k", 64), strings.Repeat("d", 64)
+	sessions.Create(ctx, keep, viewerID, models.AuthMethodPassword, time.Now().Add(time.Hour), "", "")
+	sessions.Create(ctx, drop, viewerID, models.AuthMethodPassword, time.Now().Add(time.Hour), "", "")
+	if n, err := sessions.RevokeAllForUserExcept(ctx, viewerID, keep); err != nil || n != 1 {
+		t.Errorf("RevokeAllForUserExcept = %d, %v", n, err)
+	}
+	if err := users.SetPassword(ctx, viewerID, "$2a$04$x"); err != nil {
+		t.Fatal(err)
 	}
 }

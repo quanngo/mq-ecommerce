@@ -104,6 +104,39 @@ func TestRequireAuth_PassesRawCookieValue(t *testing.T) {
 	}
 }
 
+func TestRequirePermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	run := func(user *models.SessionUser) (bool, body) {
+		app := gin.New()
+		reached := false
+		app.GET("/x", func(c *gin.Context) {
+			if user != nil {
+				c.Set(ContextUserKey, user)
+			}
+			c.Next()
+		}, RequirePermission("users.manage"), func(c *gin.Context) { reached = true })
+		w := httptest.NewRecorder()
+		app.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x", nil))
+		var b body
+		json.Unmarshal(w.Body.Bytes(), &b)
+		return reached, b
+	}
+
+	if ok, _ := run(&models.SessionUser{Permissions: []string{"orders.read", "users.manage"}}); !ok {
+		t.Error("user with the permission was rejected")
+	}
+	for name, u := range map[string]*models.SessionUser{
+		"missing permission": {Permissions: []string{"orders.read"}, RoleCode: "admin"}, // role name alone grants nothing
+		"no permissions":     {},
+		"no user":            nil,
+	} {
+		ok, b := run(u)
+		if ok || b.Code != http.StatusForbidden || b.Message != "FORBIDDEN" {
+			t.Errorf("%s: reached=%v body=%+v", name, ok, b)
+		}
+	}
+}
+
 func TestCurrentUser_WithoutRequireAuth(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())

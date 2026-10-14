@@ -33,6 +33,9 @@ clone_or_update() {
     if ! git -C "$dir" pull --ff-only; then
       echo "warning: fast-forward pull failed for $key, leaving local state untouched" >&2
     fi
+  elif [[ -z "$repo" ]]; then
+    # No REPO: the project is part of this workspace repo (see *_DIR_<N>), nothing to clone.
+    echo "==> [$type_lower/$key] lives in this repo at ${dir#"$ROOT_DIR"/}, nothing to clone ($name)"
   else
     echo "==> [$type_lower/$key] cloning $repo -> workspace/$type_lower/$key ($name)"
     mkdir -p "$(dirname "$dir")"

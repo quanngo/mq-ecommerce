@@ -35,6 +35,20 @@ func RequireAuth(auth Authenticator, cookieName string) gin.HandlerFunc {
 	}
 }
 
+// RequirePermission must run after RequireAuth. It rejects users whose role
+// lacks the permission with {code: 403, message: "FORBIDDEN"}. Check
+// permissions, never role names, so roles can change without a deploy.
+func RequirePermission(permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !CurrentUser(c).Can(permission) {
+			api.ErrorWithMessage(c, http.StatusForbidden, "FORBIDDEN")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // CurrentUser returns the user set by RequireAuth, or nil.
 func CurrentUser(c *gin.Context) *models.SessionUser {
 	v, ok := c.Get(ContextUserKey)

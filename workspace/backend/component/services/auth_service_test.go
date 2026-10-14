@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"main/component/models"
+	"main/component/repositories"
 	"main/utils"
 	"strings"
 	"testing"
@@ -18,17 +19,41 @@ import (
 
 type fakeUsers struct {
 	byID    map[int64]*models.AppUser
+	roles   map[int64]string // user id -> role code
 	nextID  int64
 	linkErr error
+	now     func() time.Time
+}
+
+// fakeRolePermissions mirrors the seed in migrations/004.
+var fakeRolePermissions = map[string][]string{
+	"admin":    {models.PermOrdersRead, models.PermOrdersWrite, models.PermUsersManage, models.PermUsersRead},
+	"operator": {models.PermOrdersRead, models.PermOrdersWrite},
+	"viewer":   {models.PermOrdersRead},
 }
 
 func newFakeUsers(users ...models.AppUser) *fakeUsers {
-	f := &fakeUsers{byID: map[int64]*models.AppUser{}, nextID: 100}
+	f := &fakeUsers{byID: map[int64]*models.AppUser{}, roles: map[int64]string{}, nextID: 100, now: time.Now}
 	for i := range users {
 		u := users[i]
 		f.byID[u.ID] = &u
+		f.roles[u.ID] = "viewer"
 	}
 	return f
+}
+
+func (f *fakeUsers) GetByID(_ context.Context, id int64) (*models.AppUser, error) {
+	if u, ok := f.byID[id]; ok {
+		c := *u
+		return &c, nil
+	}
+	return nil, nil
+}
+
+func (f *fakeUsers) SetPassword(_ context.Context, id int64, hash string) error {
+	u := f.byID[id]
+	u.PasswordHash, u.FailedLoginCount, u.LockedUntil = &hash, 0, nil
+	return nil
 }
 
 func (f *fakeUsers) GetByEmail(_ context.Context, email string) (*models.AppUser, error) {
@@ -51,10 +76,22 @@ func (f *fakeUsers) GetByGoogleSub(_ context.Context, sub string) (*models.AppUs
 	return nil, nil
 }
 
-func (f *fakeUsers) Create(_ context.Context, u models.AppUser) (int64, error) {
+func (f *fakeUsers) Create(_ context.Context, u models.AppUser, roleCode string) (int64, error) {
+	if roleCode == "" {
+		roleCode = "viewer"
+	}
+	if _, ok := fakeRolePermissions[roleCode]; !ok {
+		return 0, repositories.ErrUnknownRole
+	}
+	for _, existing := range f.byID {
+		if existing.Email == u.Email {
+			return 0, repositories.ErrDuplicateEmail
+		}
+	}
 	f.nextID++
 	u.ID = f.nextID
 	f.byID[u.ID] = &u
+	f.roles[u.ID] = roleCode
 	return u.ID, nil
 }
 
@@ -74,11 +111,16 @@ func (f *fakeUsers) LinkGoogle(_ context.Context, id int64, sub, name string, av
 	return true, nil
 }
 
+// RecordLoginFailure mirrors UserRepo: an expired lock starts a new count at 1.
 func (f *fakeUsers) RecordLoginFailure(_ context.Context, id int64, max int, lockFor time.Duration) (int, *time.Time, error) {
 	u := f.byID[id]
+	now := f.now()
+	if u.LockedUntil != nil && !u.LockedUntil.After(now) {
+		u.FailedLoginCount, u.LockedUntil = 0, nil
+	}
 	u.FailedLoginCount++
 	if u.FailedLoginCount >= max {
-		t := time.Now().Add(lockFor)
+		t := now.Add(lockFor)
 		u.LockedUntil = &t
 	}
 	return u.FailedLoginCount, u.LockedUntil, nil
@@ -117,7 +159,20 @@ func (f *fakeSessions) GetValid(_ context.Context, hash string) (*models.Session
 	if u.Status != models.UserStatusActive {
 		return nil, nil
 	}
-	return &models.SessionUser{AppUser: *u, AuthMethod: s.method, TokenHash: hash}, nil
+	role := f.users.roles[s.userID]
+	return &models.SessionUser{AppUser: *u, AuthMethod: s.method, TokenHash: hash,
+		RoleCode: role, RoleName: role, Permissions: append([]string(nil), fakeRolePermissions[role]...)}, nil
+}
+
+func (f *fakeSessions) RevokeAllForUserExcept(_ context.Context, userID int64, keep string) (int64, error) {
+	var n int64
+	for hash, s := range f.rows {
+		if s.userID == userID && hash != keep && !s.revoked {
+			s.revoked = true
+			n++
+		}
+	}
+	return n, nil
 }
 
 func (f *fakeSessions) Revoke(_ context.Context, hash string) error {

@@ -23,9 +23,8 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/lazada/lazadareadytoship": {
+        "/v1/auth/change-password": {
             "post": {
-                "description": "Receive webhook from Lazada",
                 "consumes": [
                     "application/json"
                 ],
@@ -33,9 +32,20 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "webhook"
+                    "auth"
                 ],
-                "summary": "Lazada Webhook",
+                "summary": "Change your own password (current password required if you have one); signs out your other sessions",
+                "parameters": [
+                    {
+                        "description": "passwords",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ChangePasswordRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK"
@@ -43,9 +53,48 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/lazada/webhook": {
+        "/v1/auth/google/callback": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Google redirect target: sets the session cookie and 302s to the FE",
+                "responses": {
+                    "302": {
+                        "description": "Found"
+                    }
+                }
+            }
+        },
+        "/v1/auth/google/login": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Start Google sign-in (302 to Google)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "FE path to return to after login",
+                        "name": "next",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "1 = remember me (long session, persistent cookie)",
+                        "name": "remember",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Found"
+                    }
+                }
+            }
+        },
+        "/v1/auth/login": {
             "post": {
-                "description": "Receive webhook from Lazada",
                 "consumes": [
                     "application/json"
                 ],
@@ -53,9 +102,39 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "webhook"
+                    "auth"
                 ],
-                "summary": "Lazada Webhook",
+                "summary": "Sign in with an internal email and password",
+                "parameters": [
+                    {
+                        "description": "credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.PasswordLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/logout": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke the current session and clear the cookie",
                 "responses": {
                     "200": {
                         "description": "OK"
@@ -63,9 +142,192 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/tiktok/webhook": {
+        "/v1/auth/logout-all": {
             "post": {
-                "description": "Receive webhook from TiktokShop",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke every session of the signed-in user (all devices) and clear this cookie",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.LogoutAllResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/me": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "The signed-in user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/providers": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login methods that are currently available",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProvidersResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/orders": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Orders, newest first, filtered and paginated",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "order_id, tracking_code, customer name or phone (contains)",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tiktok | Lazada | Shopee",
+                        "name": "market_place",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "1-4 (utils.LeadStatus)",
+                        "name": "lead_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "created from, YYYY-MM-DD (Vietnam time, inclusive)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "created to, YYYY-MM-DD (Vietnam time, inclusive)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "default 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "1-100, default 20",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OrderListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/orders/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "One order with its items",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ecom_order id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main_component_models.OrderDetailResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/roles": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Roles and their permissions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.RolesListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/users": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "All users (user management)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UsersListResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
                 "consumes": [
                     "application/json"
                 ],
@@ -73,12 +335,554 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "webhook"
+                    "users"
                 ],
-                "summary": "TiktokShop Webhook",
+                "summary": "Create a user (password optional: without it the account is Google-only)",
+                "parameters": [
+                    {
+                        "description": "new user",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ManagedUser"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/users/{id}": {
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Change a user's name, role or status (active/disabled)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ManagedUser"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/users/{id}/reset-password": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Set a new password for another user and sign them out everywhere",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "new password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ResetPasswordRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "main_component_models.OrderDetailResponse": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "$ref": "#/definitions/models.OrderDetail"
+                }
+            }
+        },
+        "main_component_models.OrderItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "sku": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AuthMethod": {
+            "type": "string",
+            "enum": [
+                "google",
+                "password"
+            ],
+            "x-enum-varnames": [
+                "AuthMethodGoogle",
+                "AuthMethodPassword"
+            ]
+        },
+        "models.ChangePasswordRequest": {
+            "type": "object",
+            "required": [
+                "new_password"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "maxLength": 256
+                },
+                "new_password": {
+                    "type": "string",
+                    "maxLength": 256
+                }
+            }
+        },
+        "models.CreateUserRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "role"
+            ],
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "email": {
+                    "type": "string",
+                    "maxLength": 320
+                },
+                "password": {
+                    "description": "omitted = Google-only account",
+                    "type": "string",
+                    "maxLength": 256
+                },
+                "role": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            }
+        },
+        "models.LogoutAllResponse": {
+            "type": "object",
+            "properties": {
+                "revoked_sessions": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.ManagedUser": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "google_linked": {
+                    "type": "boolean"
+                },
+                "has_password": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_login_at": {
+                    "type": "string"
+                },
+                "locked_until": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/models.RoleRef"
+                },
+                "status": {
+                    "$ref": "#/definitions/models.UserStatus"
+                }
+            }
+        },
+        "models.OrderDetail": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "do_status": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "item_count": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main_component_models.OrderItem"
+                    }
+                },
+                "lead_status": {
+                    "type": "integer"
+                },
+                "market_place": {
+                    "type": "string"
+                },
+                "neighborhood": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "string"
+                },
+                "payment_method": {
+                    "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "province": {
+                    "type": "string"
+                },
+                "shipping_fee": {
+                    "type": "number"
+                },
+                "shipping_label": {
+                    "type": "string"
+                },
+                "shop_id": {
+                    "type": "string"
+                },
+                "so_status": {
+                    "type": "integer"
+                },
+                "sub_district": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "tracking_code": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "warehouse": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.OrderListResponse": {
+            "type": "object",
+            "properties": {
+                "orders": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.OrderSummary"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.OrderSummary": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "customer_name": {
+                    "type": "string"
+                },
+                "do_status": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "item_count": {
+                    "type": "integer"
+                },
+                "lead_status": {
+                    "type": "integer"
+                },
+                "market_place": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "string"
+                },
+                "payment_method": {
+                    "type": "integer"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "shop_id": {
+                    "type": "string"
+                },
+                "so_status": {
+                    "type": "integer"
+                },
+                "total_amount": {
+                    "type": "number"
+                },
+                "tracking_code": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PasswordLoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 320
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 256
+                },
+                "remember_me": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "models.ProvidersResponse": {
+            "type": "object",
+            "properties": {
+                "google": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "models.ResetPasswordRequest": {
+            "type": "object",
+            "required": [
+                "password"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "maxLength": 256
+                }
+            }
+        },
+        "models.Role": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "is_system": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "models.RoleRef": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.RolesListResponse": {
+            "type": "object",
+            "properties": {
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Role"
+                    }
+                }
+            }
+        },
+        "models.UpdateUserRequest": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "role": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "status": {
+                    "enum": [
+                        "active",
+                        "disabled"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.UserStatus"
+                        }
+                    ]
+                }
+            }
+        },
+        "models.UserResponse": {
+            "type": "object",
+            "properties": {
+                "auth_method": {
+                    "$ref": "#/definitions/models.AuthMethod"
+                },
+                "avatar_url": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_login_at": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "role": {
+                    "$ref": "#/definitions/models.RoleRef"
+                }
+            }
+        },
+        "models.UserStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "disabled"
+            ],
+            "x-enum-varnames": [
+                "UserStatusActive",
+                "UserStatusDisabled"
+            ]
+        },
+        "models.UsersListResponse": {
+            "type": "object",
+            "properties": {
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ManagedUser"
                     }
                 }
             }
@@ -92,8 +896,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:9091",
 	BasePath:         "/api",
 	Schemes:          []string{},
-	Title:            "MQ Document API",
-	Description:      "This is a sample document for API.",
+	Title:            "MQ E-commerce Admin API",
+	Description:      "Backend of the MQ e-commerce admin app (marketplace order sync, login, users, orders).\n\nEvery JSON endpoint answers HTTP 200 with the envelope {code, message, data}: `code` is the real status, `message` the error code on failure (e.g. UNAUTHENTICATED, FORBIDDEN), and `data` is an array whose first element is the documented response model.\n\nAuth: sign in with POST /v1/auth/login (or the Google flow), which sets the httpOnly `ecom_session` cookie; send it with every request. State-changing calls must come from the frontend origin (Origin header checked). Required permissions per route: see workspace/backend/API_DOCUMENT.md.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

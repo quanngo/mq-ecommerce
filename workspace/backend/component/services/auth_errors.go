@@ -44,6 +44,16 @@ var (
 	ErrDomainNotAllowed   = &AuthError{Code: "DOMAIN_NOT_ALLOWED", Status: http.StatusForbidden}
 	ErrUserNotAllowed     = &AuthError{Code: "USER_NOT_ALLOWED", Status: http.StatusForbidden}
 	ErrInternal           = &AuthError{Code: "INTERNAL_ERROR", Status: http.StatusInternalServerError}
+
+	// Roles, user management, password changes.
+	ErrForbidden     = &AuthError{Code: "FORBIDDEN", Status: http.StatusForbidden}
+	ErrNotFound      = &AuthError{Code: "NOT_FOUND", Status: http.StatusNotFound}
+	ErrWeakPassword  = &AuthError{Code: "WEAK_PASSWORD", Status: http.StatusBadRequest}
+	ErrWrongPassword = &AuthError{Code: "WRONG_PASSWORD", Status: http.StatusBadRequest} // current password on change
+	ErrEmailTaken    = &AuthError{Code: "EMAIL_TAKEN", Status: http.StatusConflict}
+	ErrInvalidRole   = &AuthError{Code: "INVALID_ROLE", Status: http.StatusBadRequest}
+	ErrLastAdmin     = &AuthError{Code: "LAST_ADMIN", Status: http.StatusConflict}         // would leave nobody able to manage users
+	ErrSelfModify    = &AuthError{Code: "CANNOT_MODIFY_SELF", Status: http.StatusConflict} // own role/status/reset via user management
 )
 
 // wrapAuth keeps base's Code and Status and attaches cause for the logs.

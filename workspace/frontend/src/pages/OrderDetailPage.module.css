@@ -1,0 +1,162 @@
+.back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  overflow-wrap: anywhere;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* ui.card + ui.card adds a top margin; the grid's gap already spaces these.
+   :nth-child(n) lifts specificity above `.card + .card` (0,2,0) so the two
+   cards stay aligned. */
+.grid > section:nth-child(n) {
+  margin-top: 0;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fields {
+  margin: 8px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 14px;
+}
+
+.field dt {
+  color: var(--text-muted);
+}
+
+.field dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+  .field {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+.itemsCard {
+  padding: 0;
+  overflow: hidden;
+}
+
+.itemsTitle {
+  padding: 20px 24px 0;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 560px;
+}
+
+.table th,
+.table td {
+  padding: 10px 24px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: 550;
+  font-size: 13px;
+  background: var(--surface-muted);
+}
+
+.table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sku {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.totals {
+  margin: 0;
+  padding: 16px 24px 20px;
+  display: grid;
+  gap: 6px;
+  justify-content: end;
+  font-size: 14px;
+}
+
+.totals > div {
+  display: grid;
+  grid-template-columns: 140px 140px;
+  gap: 12px;
+}
+
+.totals dt {
+  color: var(--text-muted);
+}
+
+.totals dd {
+  margin: 0;
+  text-align: right;
+}
+
+.grandTotal {
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-weight: 650;
+}
+
+.grandTotal dt {
+  color: var(--text);
+}
+
+@media (max-width: 420px) {
+  .totals {
+    justify-content: stretch;
+  }
+
+  .totals > div {
+    grid-template-columns: 1fr auto;
+  }
+}

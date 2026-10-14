@@ -1,0 +1,120 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  margin-bottom: 16px;
+}
+
+.tableCard {
+  padding: 0;
+  overflow-x: auto; /* the table scrolls inside its card on phones, not the page */
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 760px;
+}
+
+.table th,
+.table td {
+  padding: 12px 16px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  color: var(--text-muted);
+  font-weight: 550;
+  font-size: 13px;
+  background: var(--surface-muted);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tr[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.userName {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.userEmail {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.methods {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lockNote {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--danger-text);
+}
+
+.when {
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.rowActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.rowActions button {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.roles {
+  display: grid;
+  gap: 14px;
+  margin: 8px 0 0;
+}
+
+.roles dd {
+  margin: 6px 0 0;
+}
+
+.roleDesc {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}

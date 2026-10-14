@@ -1,0 +1,91 @@
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.identity > div {
+  min-width: 0;
+}
+
+.avatar,
+.avatarFallback {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avatar {
+  object-fit: cover;
+}
+
+.avatarFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-weight: 650;
+  font-size: 18px;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.email {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.details dt,
+.permissionsLabel {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.details dd {
+  margin: 2px 0 0;
+  font-weight: 550;
+}
+
+.permissions {
+  margin-top: 16px;
+}
+
+.permissionsLabel {
+  margin-bottom: 6px;
+}
+
+.securityRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+
+.securityRow + .securityRow {
+  border-top: 1px solid var(--border);
+}
+
+.securityText {
+  margin: 0;
+  flex: 1 1 260px;
+  color: var(--text-muted);
+  font-size: 14px;
+}

@@ -42,7 +42,9 @@ type AuthConfig struct {
 	LoginAttemptTTLSeconds int              `yaml:"login-attempt-ttl-seconds"`
 	MaxFailedLogins        int              `yaml:"max-failed-logins"`
 	LockoutMinutes         int              `yaml:"lockout-minutes"`
-	RememberMeDays         int              `yaml:"remember-me-days"` // session length when "Ghi nhớ đăng nhập" is ticked
+	RememberMeDays         int              `yaml:"remember-me-days"`    // session length when "Ghi nhớ đăng nhập" is ticked
+	MinPasswordLength      int              `yaml:"min-password-length"` // for new/changed passwords (not the seeded default admin)
+	DefaultRole            string           `yaml:"default-role"`        // role code for auto-provisioned Google users and create-user without --role
 	Google                 GoogleAuthConfig `yaml:"google"`
 }
 
@@ -57,7 +59,7 @@ type GoogleAuthConfig struct {
 
 func (c AuthConfig) WithDefaults() AuthConfig {
 	if c.FrontendURL == "" {
-		c.FrontendURL = "http://localhost:5173"
+		c.FrontendURL = "http://localhost:8088"
 	}
 	if c.CookieName == "" {
 		c.CookieName = "ecom_session"
@@ -76,6 +78,12 @@ func (c AuthConfig) WithDefaults() AuthConfig {
 	}
 	if c.RememberMeDays <= 0 {
 		c.RememberMeDays = 7
+	}
+	if c.MinPasswordLength <= 0 {
+		c.MinPasswordLength = 10
+	}
+	if c.DefaultRole == "" {
+		c.DefaultRole = "viewer"
 	}
 	return c
 }

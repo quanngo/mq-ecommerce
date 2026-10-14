@@ -5,7 +5,7 @@ import "testing"
 func TestAuthConfigWithDefaults(t *testing.T) {
 	got := AuthConfig{}.WithDefaults()
 	want := AuthConfig{
-		FrontendURL: "http://localhost:5173", CookieName: "ecom_session", SessionTTLHours: 12,
+		FrontendURL: "http://localhost:8088", CookieName: "ecom_session", SessionTTLHours: 12,
 		LoginAttemptTTLSeconds: 600, MaxFailedLogins: 5, LockoutMinutes: 15,
 	}
 	if got.FrontendURL != want.FrontendURL || got.CookieName != want.CookieName || got.SessionTTLHours != want.SessionTTLHours ||
