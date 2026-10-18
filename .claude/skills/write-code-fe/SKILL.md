@@ -37,7 +37,7 @@ use. Ask the developer rather than guess. This skill never writes backend code.
    - where it lives (new route or existing page; whether it needs login);
    - what each state looks like: loading, empty, error, success;
    - which endpoint(s) to call;
-   - the Vietnamese wording of labels and errors, when it matters.
+   - the wording of labels and errors (Vietnamese and English), when it matters.
 
    Once those are answered, go straight to implementation. There is no separate design sign-off.
 
@@ -53,11 +53,19 @@ use. Ask the developer rather than guess. This skill never writes backend code.
      so light and dark both work, and make sure it works at phone width.
    - **State**: local `useState`/`useEffect`, plus `useAuth()` for the user. Don't
      add a state library, a component library or a CSS framework.
-   - **Errors**: map backend error codes to Vietnamese text in a `*Messages.js`
-     map with a generic fallback, and show them with `role="alert"`. Show loading
-     with the `Spinner` component (`role="status"`).
+   - **Text (EC-7)**: no hard-coded UI strings. Add keys to **both**
+     `src/locales/vi.json` and `src/locales/en.json` (a test checks they match)
+     and render them with `const { t } = useTranslation()`. Format dates, numbers
+     and money with `src/i18n/format.js`, never a hard-coded `'vi-VN'`.
+   - **Errors**: keep the error (the `ApiError` or code) in state and translate it
+     at render with `actionErrorMessage`/`orderErrorMessage` (wording under
+     `errors.<context>.<CODE>` in the locale files; the backend's `error_text`
+     is the fallback), so a language switch re-translates it. Show errors with
+     `role="alert"` and loading with the `Spinner` component (`role="status"`).
+   - **Tests**: tests run in Vietnamese (`test/setup.js` pins it); switch with
+     `i18n.changeLanguage('en')` when a test is about English.
    - **Storage**: nothing auth-related or user-related goes in `localStorage` or
-     `sessionStorage`.
+     `sessionStorage` (the only stored value is the UI language code).
 
 7. **Integrate.** Check field names against the Go DTO's `json` tags, which are
    snake_case (for example `display_name`). Remember that the backend's `data`

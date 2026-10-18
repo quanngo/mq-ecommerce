@@ -1,12 +1,13 @@
 // Cross-tab auth notifications. Messages carry no data (no user, no token):
-// only 'login' or 'logout', so a receiving tab asks the server itself.
+// only 'login', 'logout' or 'locale' (the user changed the UI language), so a
+// receiving tab asks the server itself.
 
 const CHANNEL_NAME = 'mq-admin-auth';
-const MESSAGES = new Set(['login', 'logout']);
+const MESSAGES = new Set(['login', 'logout', 'locale']);
 
 /**
- * @param {(message: 'login' | 'logout') => void} onMessage  called for messages from *other* tabs
- * @returns {{ post: (message: 'login' | 'logout') => void, close: () => void }}
+ * @param {(message: 'login' | 'logout' | 'locale') => void} onMessage  called for messages from *other* tabs
+ * @returns {{ post: (message: 'login' | 'logout' | 'locale') => void, close: () => void }}
  */
 export function createAuthChannel(onMessage) {
   if (typeof BroadcastChannel === 'undefined') {

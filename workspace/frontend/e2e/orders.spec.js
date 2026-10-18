@@ -38,7 +38,8 @@ test('menu -> filtered list -> detail -> back keeps the filter', async ({ page }
 
   await page.getByRole('link', { name: '‹ Quay lại danh sách' }).click();
   await expect(page).toHaveURL(new RegExp(`/orders\\?q=${encodeURIComponent(ORDER_QUERY)}$`));
-  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+  // Only the UI language code may be stored in the browser.
+  expect(await page.evaluate(() => [Object.keys(localStorage), sessionStorage.length])).toEqual([['mq-admin-lang'], 0]);
 });
 
 test('an invalid date range is explained, an unknown order says not found', async ({ page }) => {

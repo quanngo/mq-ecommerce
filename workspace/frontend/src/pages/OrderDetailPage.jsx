@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { ordersApi } from '../api/orders';
@@ -11,13 +12,14 @@ import {
   paymentMethodLabel,
   saleOrderStatusLabel,
 } from './orderFormat';
-import { formatDateTime } from './ProfilePage';
+import { formatDateTime } from '../i18n/format';
 import { Spinner } from './Spinner';
 import styles from './OrderDetailPage.module.css';
 import ui from './ui.module.css';
 
 /** One order with its items (orders.detail). */
 export function OrderDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const location = useLocation();
   // Back to the list with the filters the user came from.
@@ -33,7 +35,7 @@ export function OrderDetailPage() {
     ordersApi
       .get(id)
       .then((o) => !cancelled && setOrder(o))
-      .catch((err) => !cancelled && setError(orderErrorMessage(err instanceof ApiError ? err.errorCode : null)));
+      .catch((err) => !cancelled && setError(err instanceof ApiError ? err : 'INTERNAL_ERROR'));
     return () => {
       cancelled = true;
     };
@@ -41,7 +43,7 @@ export function OrderDetailPage() {
 
   const back = (
     <Link to={backTo} className={styles.back}>
-      ‹ Quay lại danh sách
+      {t('orderDetail.back')}
     </Link>
   );
 
@@ -50,12 +52,12 @@ export function OrderDetailPage() {
       <main className={ui.main}>
         {back}
         <div className={ui.error} role="alert">
-          {error}
+          {orderErrorMessage(error)}
         </div>
       </main>
     );
   }
-  if (!order) return <Spinner label="Đang tải đơn hàng…" />;
+  if (!order) return <Spinner label={t('orderDetail.loading')} />;
 
   const subtotal = order.items.reduce((sum, it) => sum + it.price * it.quantity, 0);
   const address = [order.address, order.neighborhood, order.sub_district, order.district, order.province].filter(Boolean).join(', ');
@@ -64,7 +66,7 @@ export function OrderDetailPage() {
     <main className={ui.main}>
       {back}
       <div className={styles.header}>
-        <h1 className={ui.title}>Đơn hàng {orderLabel(order)}</h1>
+        <h1 className={ui.title}>{t('orderDetail.title', { label: orderLabel(order) })}</h1>
         <span className={order.lead_status === 3 || order.lead_status === 4 ? ui.badgeDanger : ui.badge}>
           {leadStatusLabel(order.lead_status)}
         </span>
@@ -73,56 +75,56 @@ export function OrderDetailPage() {
       <div className={styles.grid}>
         <section className={ui.card} aria-labelledby="order-info">
           <h2 id="order-info" className={ui.sectionTitle}>
-            Thông tin đơn
+            {t('orderDetail.info')}
           </h2>
           <dl className={styles.fields}>
-            <Field label="Sàn">{marketPlaceLabel(order.market_place)}</Field>
-            <Field label="Shop">{order.shop_id}</Field>
-            <Field label="Mã đơn sàn">{order.order_id}</Field>
-            <Field label="Mã vận đơn">{order.tracking_code}</Field>
-            <Field label="Trạng thái giao hàng">{order.do_status}</Field>
-            <Field label="Trạng thái đơn bán">{saleOrderStatusLabel(order.so_status)}</Field>
-            <Field label="Thanh toán">{paymentMethodLabel(order.payment_method)}</Field>
-            <Field label="Kho">{order.warehouse}</Field>
-            <Field label="Ngày tạo">{formatDateTime(order.created_at)}</Field>
-            <Field label="Cập nhật">{formatDateTime(order.updated_at)}</Field>
+            <Field label={t('orderDetail.marketPlace')}>{marketPlaceLabel(order.market_place)}</Field>
+            <Field label={t('orderDetail.shop')}>{order.shop_id}</Field>
+            <Field label={t('orderDetail.orderId')}>{order.order_id}</Field>
+            <Field label={t('orderDetail.tracking')}>{order.tracking_code}</Field>
+            <Field label={t('orderDetail.doStatus')}>{order.do_status}</Field>
+            <Field label={t('orderDetail.soStatus')}>{saleOrderStatusLabel(order.so_status)}</Field>
+            <Field label={t('orderDetail.payment')}>{paymentMethodLabel(order.payment_method)}</Field>
+            <Field label={t('orderDetail.warehouse')}>{order.warehouse}</Field>
+            <Field label={t('orderDetail.created')}>{formatDateTime(order.created_at)}</Field>
+            <Field label={t('orderDetail.updated')}>{formatDateTime(order.updated_at)}</Field>
           </dl>
         </section>
 
         <section className={ui.card} aria-labelledby="order-customer">
           <h2 id="order-customer" className={ui.sectionTitle}>
-            Khách hàng
+            {t('orderDetail.customer')}
           </h2>
           <dl className={styles.fields}>
-            <Field label="Tên">{order.customer_name}</Field>
-            <Field label="SĐT">{order.phone}</Field>
-            <Field label="Địa chỉ">{address}</Field>
-            <Field label="Ghi chú">{order.comment}</Field>
+            <Field label={t('orderDetail.name')}>{order.customer_name}</Field>
+            <Field label={t('orderDetail.phone')}>{order.phone}</Field>
+            <Field label={t('orderDetail.address')}>{address}</Field>
+            <Field label={t('orderDetail.comment')}>{order.comment}</Field>
           </dl>
         </section>
       </div>
 
       <section className={`${ui.card} ${styles.itemsCard}`} aria-labelledby="order-items">
         <h2 id="order-items" className={`${ui.sectionTitle} ${styles.itemsTitle}`}>
-          Sản phẩm ({order.items.length})
+          {t('orderDetail.items', { count: order.items.length })}
         </h2>
         {order.items.length === 0 ? (
-          <p className={`${ui.muted} ${styles.itemsTitle}`}>Đơn hàng không có sản phẩm.</p>
+          <p className={`${ui.muted} ${styles.itemsTitle}`}>{t('orderDetail.noItems')}</p>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th scope="col">Sản phẩm</th>
-                  <th scope="col">SKU</th>
+                  <th scope="col">{t('orderDetail.colProduct')}</th>
+                  <th scope="col">{t('orderDetail.colSku')}</th>
                   <th scope="col" className={styles.num}>
-                    SL
+                    {t('orderDetail.colQty')}
                   </th>
                   <th scope="col" className={styles.num}>
-                    Đơn giá
+                    {t('orderDetail.colPrice')}
                   </th>
                   <th scope="col" className={styles.num}>
-                    Thành tiền
+                    {t('orderDetail.colAmount')}
                   </th>
                 </tr>
               </thead>
@@ -143,19 +145,19 @@ export function OrderDetailPage() {
 
         <dl className={styles.totals}>
           <div>
-            <dt>Tiền hàng</dt>
+            <dt>{t('orderDetail.subtotal')}</dt>
             <dd>{formatMoney(subtotal)}</dd>
           </div>
           <div>
-            <dt>Giảm giá</dt>
+            <dt>{t('orderDetail.discount')}</dt>
             <dd>{order.discount ? `−${formatMoney(order.discount)}` : formatMoney(0)}</dd>
           </div>
           <div>
-            <dt>Phí vận chuyển</dt>
+            <dt>{t('orderDetail.shippingFee')}</dt>
             <dd>{formatMoney(order.shipping_fee)}</dd>
           </div>
           <div className={styles.grandTotal}>
-            <dt>Tổng tiền</dt>
+            <dt>{t('orderDetail.total')}</dt>
             <dd>{formatMoney(order.total_amount)}</dd>
           </div>
         </dl>

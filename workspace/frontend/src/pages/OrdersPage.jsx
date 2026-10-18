@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { ordersApi } from '../api/orders';
 import { useAuth } from '../auth/AuthContext';
 import { orderErrorMessage } from '../auth/errorMessages';
-import { LEAD_STATUS_LABELS, MARKET_PLACES, formatMoney, leadStatusLabel, marketPlaceLabel, orderLabel } from './orderFormat';
-import { formatDateTime } from './ProfilePage';
+import { formatDateTime, formatNumber } from '../i18n/format';
+import { LEAD_STATUSES, MARKET_PLACES, formatMoney, leadStatusLabel, marketPlaceLabel, orderLabel } from './orderFormat';
 import { Spinner } from './Spinner';
 import styles from './OrdersPage.module.css';
 import ui from './ui.module.css';
@@ -21,6 +22,7 @@ const filtersFrom = (params) => Object.fromEntries(FILTER_KEYS.map((k) => [k, pa
  * orders.detail.
  */
 export function OrdersPage() {
+  const { t } = useTranslation();
   const { can } = useAuth();
   const canDetail = can('orders.detail');
   const [params, setParams] = useSearchParams();
@@ -30,7 +32,7 @@ export function OrdersPage() {
   const [result, setResult] = useState(null); // { orders, total, page, page_size } | null while loading
   const [error, setError] = useState(null);
 
-  // Keep the form in step with the URL (Back/Forward, "Xoá lọc").
+  // Keep the form in step with the URL (Back/Forward, "Clear filters").
   useEffect(() => {
     setForm(filtersFrom(new URLSearchParams(search)));
   }, [search]);
@@ -44,7 +46,7 @@ export function OrdersPage() {
       .then((res) => !cancelled && setResult(res))
       .catch((err) => {
         if (cancelled) return;
-        setError(orderErrorMessage(err instanceof ApiError ? err.errorCode : null));
+        setError(err instanceof ApiError ? err : 'INTERNAL_ERROR');
         setResult({ orders: [], total: 0, page: 1, page_size: 20 });
       });
     return () => {
@@ -75,24 +77,24 @@ export function OrdersPage() {
 
   return (
     <main className={`${ui.main} ${styles.wide}`}>
-      <h1 className={ui.title}>Đơn hàng</h1>
+      <h1 className={ui.title}>{t('orders.title')}</h1>
 
-      <form className={`${ui.card} ${styles.filters}`} onSubmit={onSubmit} role="search" aria-label="Lọc đơn hàng">
+      <form className={`${ui.card} ${styles.filters}`} onSubmit={onSubmit} role="search" aria-label={t('orders.filters')}>
         <label className={`${ui.label} ${styles.search}`}>
-          Tìm kiếm
+          {t('orders.search')}
           <input
             className={ui.input}
             type="search"
             value={form.q}
             onChange={set('q')}
-            placeholder="Mã đơn, mã vận đơn, tên khách, SĐT"
+            placeholder={t('orders.searchPlaceholder')}
             maxLength={100}
           />
         </label>
         <label className={ui.label}>
-          Sàn
+          {t('orders.marketPlace')}
           <select className={ui.select} value={form.market_place} onChange={set('market_place')}>
-            <option value="">Tất cả</option>
+            <option value="">{t('common.all')}</option>
             {MARKET_PLACES.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
@@ -101,31 +103,31 @@ export function OrdersPage() {
           </select>
         </label>
         <label className={ui.label}>
-          Trạng thái
+          {t('orders.status')}
           <select className={ui.select} value={form.lead_status} onChange={set('lead_status')}>
-            <option value="">Tất cả</option>
-            {Object.entries(LEAD_STATUS_LABELS).map(([value, label]) => (
+            <option value="">{t('common.all')}</option>
+            {LEAD_STATUSES.map((value) => (
               <option key={value} value={value}>
-                {label}
+                {leadStatusLabel(value)}
               </option>
             ))}
           </select>
         </label>
         <label className={ui.label}>
-          Từ ngày
+          {t('orders.from')}
           <input className={ui.input} type="date" value={form.from} onChange={set('from')} max={form.to || undefined} />
         </label>
         <label className={ui.label}>
-          Đến ngày
+          {t('orders.to')}
           <input className={ui.input} type="date" value={form.to} onChange={set('to')} min={form.from || undefined} />
         </label>
         <div className={styles.filterActions}>
           <button className={ui.primaryButton} type="submit">
-            Lọc
+            {t('orders.filter')}
           </button>
           {hasFilters && (
             <button className={ui.secondaryButton} type="button" onClick={() => apply(EMPTY_FILTERS)}>
-              Xoá lọc
+              {t('orders.clear')}
             </button>
           )}
         </div>
@@ -133,16 +135,16 @@ export function OrdersPage() {
 
       {error && (
         <div className={ui.error} role="alert">
-          {error}
+          {orderErrorMessage(error)}
         </div>
       )}
 
       {result === null ? (
-        <Spinner label="Đang tải danh sách đơn hàng…" />
+        <Spinner label={t('orders.loading')} />
       ) : (
         <>
           <p className={styles.summary} role="status">
-            {result.total === 0 ? 'Không có đơn hàng nào.' : `${result.total.toLocaleString('vi-VN')} đơn hàng`}
+            {result.total === 0 ? t('orders.empty') : t('orders.count', { count: result.total, total: formatNumber(result.total) })}
           </p>
 
           {result.orders.length > 0 && (
@@ -150,15 +152,15 @@ export function OrdersPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th scope="col">Mã đơn</th>
-                    <th scope="col">Sàn</th>
-                    <th scope="col">Khách hàng</th>
-                    <th scope="col">SĐT</th>
+                    <th scope="col">{t('orders.colOrder')}</th>
+                    <th scope="col">{t('orders.colMarketPlace')}</th>
+                    <th scope="col">{t('orders.colCustomer')}</th>
+                    <th scope="col">{t('orders.colPhone')}</th>
                     <th scope="col" className={styles.num}>
-                      Tổng tiền
+                      {t('orders.colTotal')}
                     </th>
-                    <th scope="col">Trạng thái</th>
-                    <th scope="col">Ngày tạo</th>
+                    <th scope="col">{t('orders.colStatus')}</th>
+                    <th scope="col">{t('orders.colCreated')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -172,11 +174,11 @@ export function OrdersPage() {
                         ) : (
                           <span className={styles.orderId}>{orderLabel(o)}</span>
                         )}
-                        {o.tracking_code && <div className={styles.sub}>Vận đơn: {o.tracking_code}</div>}
+                        {o.tracking_code && <div className={styles.sub}>{t('orders.tracking', { code: o.tracking_code })}</div>}
                       </td>
                       <td>
                         <div>{marketPlaceLabel(o.market_place)}</div>
-                        {o.shop_id && <div className={styles.sub}>Shop {o.shop_id}</div>}
+                        {o.shop_id && <div className={styles.sub}>{t('orders.shop', { id: o.shop_id })}</div>}
                       </td>
                       <td>{o.customer_name || '—'}</td>
                       <td className={styles.nowrap}>{o.phone || '—'}</td>
@@ -195,15 +197,15 @@ export function OrdersPage() {
           )}
 
           {pages > 1 && (
-            <nav className={styles.pager} aria-label="Phân trang">
+            <nav className={styles.pager} aria-label={t('orders.pagination')}>
               <button className={ui.secondaryButton} type="button" disabled={page <= 1} onClick={() => apply(filtersFrom(params), page - 1)}>
-                ‹ Trước
+                {t('orders.prev')}
               </button>
               <span className={styles.pageInfo}>
-                Trang {page} / {pages}
+                {t('orders.page', { page, pages })}
               </span>
               <button className={ui.secondaryButton} type="button" disabled={page >= pages} onClick={() => apply(filtersFrom(params), page + 1)}>
-                Sau ›
+                {t('orders.next')}
               </button>
             </nav>
           )}

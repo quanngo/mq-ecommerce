@@ -9,8 +9,26 @@ React 18 + Vite, plain JavaScript (JSX), React Router 6, CSS modules. Pages:
   marketplace, status and creation date, 20 per page; filters live in the URL;
 - order detail (`/orders/:id`, needs `orders.detail`): order info, customer and address, items, totals.
 
-Tickets EC-1 (login, users), EC-4 (orders). The backend is `workspace/backend`; its API is in
-`workspace/backend/API_DOCUMENT.md`.
+Tickets EC-1 (login, users), EC-4 (orders), EC-7 (Vietnamese / English). The backend is
+`workspace/backend`; its API is in `workspace/backend/API_DOCUMENT.md`.
+
+## Languages (EC-7)
+
+The UI is in **Vietnamese** (default) and **English**, switched with the VI / EN toggle in the
+top bar or on the login page.
+
+- Signed in, the choice is saved on the account (`PUT /api/v1/auth/me/locale`), so it follows the
+  user to other browsers; other open tabs switch too. Signed out, it is remembered in this
+  browser (`localStorage` key `mq-admin-lang`, the language code only). A first visit uses the
+  browser language when it is English, otherwise Vietnamese.
+- The backend answers in the same language: `error_text` on errors and role/permission names.
+  Error codes (`message`) never change.
+- **Add a string**: add the same key to `src/locales/vi.json` and `src/locales/en.json`, then
+  `const { t } = useTranslation(); t('area.key')`. `npm test` fails if the two files have
+  different keys.
+- **Add a language**: `src/locales/<code>.json` + an entry in `LANGUAGES` (`src/i18n/index.js`),
+  and on the backend `i18n/locales/<code>.json`, `i18n.Supported` and a migration widening
+  `ck_user_config_locale`.
 
 ## Run
 
@@ -55,15 +73,16 @@ go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen"   # Googl
 
 - The **backend** is the OAuth client and owns the session. The browser only holds the
   httpOnly `ecom_session` cookie. JS can't read it, and the app never stores
-  tokens or user data in `localStorage`/`sessionStorage`. A test checks this.
+  tokens or user data in `localStorage`/`sessionStorage` (only the UI language
+  code, `mq-admin-lang`). A test checks this.
 - The FE and the API must be **same-origin** (Vite proxy in dev, a reverse proxy
   that serves `/` and `/api` from one host in other environments). The cookie is
   `SameSite=Lax`, and the backend rejects a POST whose `Origin` isn't `auth.frontend-url`.
 - "Đăng nhập với Google" is a full-page link to `/api/v1/auth/google/login?next=…`,
   not `fetch`. Callback errors come back as `/login?error=CODE`. The messages are
-  in `src/auth/errorMessages.js`.
-- API responses are always HTTP 200 with `{code, message, data[]}`.
-  `src/api/client.js` unwraps `data[0]` and throws `ApiError(code, errorCode)`.
+  in `src/locales/*.json` under `errors.login`.
+- API responses are always HTTP 200 with `{code, message, error_text?, data[]}`.
+  `src/api/client.js` unwraps `data[0]` and throws `ApiError(code, errorCode, errorText)`.
   Any `UNAUTHENTICATED` drops the user back to the login page.
 
 ## Test

@@ -77,3 +77,9 @@
     display: none;
   }
 }
+
+.banner {
+  max-width: 960px;
+  margin: 16px auto 0;
+  width: calc(100% - 32px);
+}

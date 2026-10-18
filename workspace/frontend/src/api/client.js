@@ -1,20 +1,26 @@
 // Thin fetch wrapper for the Go backend.
 //
 // Backend convention (workspace/backend/component/api/response.go): every
-// response is HTTP 200 with body {code, message, data}; `code` is the real
-// status, `message` carries the stable error code on failure, and `data` is
-// always an array.
+// response is HTTP 200 with body {code, message, error_text?, data}; `code` is
+// the real status, `message` carries the stable error code on failure,
+// `error_text` the same error in the user's language, and `data` is always an
+// array. Every request sends the UI language as Accept-Language, which the
+// backend uses until it knows the signed-in user's saved language.
+
+import { currentLanguage } from '../i18n';
 
 export class ApiError extends Error {
   /**
    * @param {number} code      status from the response body (0 = network failure)
    * @param {string} errorCode stable backend code, e.g. INVALID_CREDENTIALS
+   * @param {string | null} [errorText] backend's message for it, already translated
    */
-  constructor(code, errorCode) {
+  constructor(code, errorCode, errorText = null) {
     super(errorCode);
     this.name = 'ApiError';
     this.code = code;
     this.errorCode = errorCode;
+    this.errorText = errorText;
   }
 }
 
@@ -31,13 +37,13 @@ export function onUnauthorized(listener) {
 }
 
 /**
- * @param {'GET' | 'POST'} method
+ * @param {'GET' | 'POST' | 'PUT' | 'PATCH'} method
  * @param {string} path  relative to /api/v1, e.g. "/auth/me"
  * @param {unknown} [body]
  * @returns {Promise<any>} data[0] of the response, or undefined
  */
 export async function apiRequest(method, path, body) {
-  const headers = { Accept: 'application/json' };
+  const headers = { Accept: 'application/json', 'Accept-Language': currentLanguage() };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   let res;
@@ -63,7 +69,7 @@ export async function apiRequest(method, path, body) {
     if (envelope.message === 'UNAUTHENTICATED') {
       unauthorizedListeners.forEach((l) => l());
     }
-    throw new ApiError(envelope.code, envelope.message || 'INTERNAL_ERROR');
+    throw new ApiError(envelope.code, envelope.message || 'INTERNAL_ERROR', envelope.error_text || null);
   }
   return envelope.data?.[0];
 }

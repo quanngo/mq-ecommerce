@@ -43,6 +43,11 @@ developer over guessing. This skill never writes or modifies frontend code.
    relevant `workspace/backend/<key>/` project, following that project's
    existing framework and conventions exactly. Don't introduce a new
    library, pattern, or folder structure it doesn't already use.
+   In the Go backend (EC-7), anything a user reads is translated: a new error
+   code needs `error.<CODE>` in both `i18n/locales/vi.json` and `en.json`
+   (it becomes `error_text`; the code in `message` never changes), and names or
+   labels go through `i18n.T(i18n.Locale(c), key)`. Per-user settings are
+   columns of `public.user_config`, not new tables.
 
 6. **Implement the frontend — not applicable.** This skill never writes
    frontend code. If a frontend also needs updating to use this API, tell

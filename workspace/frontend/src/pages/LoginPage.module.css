@@ -176,3 +176,15 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Language switcher in the page's top-right corner; the page padding keeps it clear of the card. */
+.page {
+  position: relative;
+  padding-top: 64px;
+}
+
+.language {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}

@@ -20,6 +20,11 @@ func TestParseCreateUserArgs(t *testing.T) {
 		t.Errorf("google-only: %+v err=%v (stdin must be ignored without --password-stdin; role defaults later)", in, err)
 	}
 
+	in, err = parseCreateUserArgs([]string{"--email", "en@mq.com", "--locale", "en"}, strings.NewReader(""))
+	if err != nil || in.Locale != "en" {
+		t.Errorf("--locale: %+v err=%v", in, err)
+	}
+
 	in, err = parseCreateUserArgs([]string{"--email", "a@mq.com", "--password-stdin"}, strings.NewReader("no-newline-at-eof"))
 	if err != nil || in.Password == nil || *in.Password != "no-newline-at-eof" {
 		t.Errorf("password without trailing newline: %+v err=%v", in, err)

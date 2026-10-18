@@ -49,7 +49,9 @@ Never invent schema, an API shape or a convention. Ask the developer rather than
      `services/auth_errors.go`).
    - **Handler**: `component/handlers/rest/<area>_handler.go`, mounted in
      `rest.go`. Respond only with `api.Ok` / `api.ErrorWithMessage` (HTTP 200, real
-     status in `code`, error code in `message`). Never echo `err.Error()` for a bind
+     status in `code`, error code in `message`; `error_text` is added from the
+     `error.<CODE>` keys in `i18n/locales/{vi,en}.json`, so add both for a new
+     code). Text the user reads (names, labels) goes through `i18n.T(i18n.Locale(c), key)`. Never echo `err.Error()` for a bind
      error. Put routes that need login in a group built with `requireAuth`, and add
      `sameOrigin` to state-changing routes.
    - **Wiring**: `server/base.go`. Add the new dependency to each of `Initialize()`,
@@ -63,8 +65,12 @@ Never invent schema, an API shape or a convention. Ask the developer rather than
    - The route goes in `App.jsx`, inside `ProtectedRoute` if it needs login.
    - The page goes in `src/pages/<Name>Page.jsx` with a CSS module that uses the
      `var(--…)` tokens.
-   - Error codes map to Vietnamese messages.
-   - Nothing goes in `localStorage`/`sessionStorage`.
+   - All UI text goes in `src/locales/vi.json` **and** `en.json` (`t(...)`);
+     error codes map to messages there (`errors.<context>.<CODE>`).
+   - Backend text the user reads (new error codes, role/permission names) goes
+     in `i18n/locales/vi.json` **and** `en.json`; never return translated text
+     in place of a stable error code.
+   - Nothing goes in `localStorage`/`sessionStorage` except the UI language code.
 
 7. **Integrate**: match the frontend to the backend you just wrote, verified
    against the code, not assumed:

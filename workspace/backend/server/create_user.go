@@ -18,6 +18,7 @@ import (
 //
 //	go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen" --role admin --password-stdin < pw.txt
 //	go run main.go create-user --email an.nguyen@mq.com --name "An Nguyen"   # Google-only, auth.default-role
+//	go run main.go create-user --email an.nguyen@mq.com --locale en          # UI in English (default vi)
 //
 // The password is only ever read from stdin, so it never lands in shell
 // history or the process list. Roles: admin | operator | viewer (migrations/004).
@@ -57,6 +58,7 @@ func parseCreateUserArgs(args []string, stdin io.Reader) (services.CreateUserInp
 	fs.StringVar(&in.Email, "email", "", "login email (required)")
 	fs.StringVar(&in.DisplayName, "name", "", "display name")
 	fs.StringVar(&in.Role, "role", "", "role code: admin | operator | viewer (default: auth.default-role)")
+	fs.StringVar(&in.Locale, "locale", "", "UI language: vi | en (default: vi)")
 	pwStdin := fs.Bool("password-stdin", false, "read the password from the first line of stdin")
 	if err := fs.Parse(args); err != nil {
 		return in, err

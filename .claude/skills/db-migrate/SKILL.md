@@ -50,6 +50,13 @@ re-running anything, so always preview it, confirm it, then execute.
     with inline constraints. The column definitions were reconstructed from
     the code, not dumped from a live DB.
 - `001_create_ecom_order.sql` creates `public.ecom_order` and `public.ecom_order_item`.
+- `002`–`005` are the admin app's auth and RBAC (EC-1, EC-3, EC-4): `app_user`,
+  `user_session`, `oauth_login_attempt`, `role`, `permission`, `role_permission`,
+  the default admin and `orders.detail`. See the `admin-auth` skill.
+- `006_user_config.sql` creates `public.user_config`, per-user settings 1-1 with
+  `app_user` (`user_id` is PK and FK, `ON DELETE CASCADE`), starting with
+  `locale` (`vi`|`en`, EC-7), and backfills a row for every existing user. Code
+  reads a missing row as `vi`.
 - `dev/connector_tables.sql` holds minimal stand-ins for the Connector's
   `public.od_ecom_order`, `od_do_new` and `od_sale_order`. It is **local
   only**: `migrate.sh` never applies subdirectories. Load it with `psql -f`
@@ -81,8 +88,8 @@ change, also extend the matching test.
 ## Writing a new migration
 
 - **Name:** `NNN_short_description.sql` in `workspace/backend/migrations/`,
-  with NNN one higher than the current highest (`001_create_ecom_order.sql`
-  exists). Files apply in filename order. Only letters, digits, `_ . -` are
+  with NNN one higher than the current highest (`006_user_config.sql`
+  today). Files apply in filename order. Only letters, digits, `_ . -` are
   accepted.
 - **Never edit a file that has been applied.** Its name is already recorded,
   so the change would never run. Write a new file instead.
@@ -95,7 +102,10 @@ change, also extend the matching test.
   is large.
 - Every table lives in `public`. Don't create anything in the old
   `ecommerce` schema. Prefix new tables with `ecom_` (`ecom_order`,
-  `ecom_order_item`, `ecom_schema_migrations`). `public` is shared with the
+  `ecom_order_item`, `ecom_schema_migrations`). The admin app's account tables
+  (`app_user`, `user_session`, `oauth_login_attempt`, `role`, `permission`,
+  `role_permission`, `user_config`) are the existing exception; new per-user
+  settings go in `user_config` as columns, not in a new table. `public` is shared with the
   Connector (formerly TMS) system, so check that the name is free
   (`\dt public.<name>`) and never alter its `od_*` tables. Always
   schema-qualify names (`public.x`) in migrations and repository SQL.

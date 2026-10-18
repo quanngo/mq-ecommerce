@@ -27,7 +27,7 @@ func APIRoutes(app *gin.Engine, apiServer *ApiServer) {
 	requireAuth := middleware.RequireAuth(apiServer.AuthSvc, authCfg.CookieName)
 	sameOrigin := middleware.RequireSameOrigin(authCfg.FrontendURL)
 
-	apiGroup := app.Group("/api/v1")
+	apiGroup := app.Group("/api/v1", middleware.Locale())
 
 	authHandler := &AuthHandler{AuthSvc: apiServer.AuthSvc, Cfg: authCfg}
 	authHandler.Router(apiGroup.Group("/auth"), requireAuth, sameOrigin)

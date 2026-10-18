@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Spinner } from '../pages/Spinner';
@@ -9,10 +10,11 @@ import { ForbiddenPage } from '../pages/ForbiddenPage';
  * backend enforces the same permission, so this only keeps the UI honest.
  */
 export function ProtectedRoute({ permission }) {
+  const { t } = useTranslation();
   const { state, can } = useAuth();
   const location = useLocation();
 
-  if (state.status === 'loading') return <Spinner label="Đang kiểm tra phiên đăng nhập…" />;
+  if (state.status === 'loading') return <Spinner label={t('common.checkingSession')} />;
   if (state.status === 'anonymous') {
     const next = location.pathname + location.search;
     return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;

@@ -1,39 +1,20 @@
-// Labels and formatting for orders. Codes mirror workspace/backend/utils/constants.go.
+// Labels and formatting for orders. Codes mirror workspace/backend/utils/constants.go;
+// the wording is in src/locales/*.json (orders.leadStatus, saleOrderStatus, paymentMethod).
+// Call these during render in a component that uses useTranslation().
 
-/** Filterable marketplaces (utils.Plaform). */
+import i18n from '../i18n';
+
+export { formatMoney } from '../i18n/format';
+
+/** Filterable marketplaces (utils.Plaform). Brand names: not translated. */
 export const MARKET_PLACES = [
   { value: 'Tiktok', label: 'TikTok Shop' },
   { value: 'Lazada', label: 'Lazada' },
   { value: 'Shopee', label: 'Shopee' },
 ];
 
-/** utils.LeadStatus */
-export const LEAD_STATUS_LABELS = {
-  1: 'Chờ hàng',
-  2: 'Đã tạo đơn',
-  3: 'Hoàn tiền',
-  4: 'Đã huỷ',
-};
-
-/** utils.SaleOrderStatus */
-const SALE_ORDER_STATUS_LABELS = {
-  41: 'Mới',
-  42: 'Chờ xử lý',
-  43: 'Đã xác nhận',
-  44: 'Đã huỷ',
-  45: 'Thành công',
-  46: 'Chưa phân công',
-  48: 'Tạo vận đơn lỗi',
-  49: 'Hoàn tất',
-  50: 'Hoàn tiền',
-  357: 'Chờ xác nhận',
-};
-
-/** utils.PAYMENT_METHOD_* */
-const PAYMENT_METHOD_LABELS = {
-  1: 'COD',
-  8: 'Thanh toán qua sàn',
-};
+/** utils.LeadStatus values, in filter order. */
+export const LEAD_STATUSES = [1, 2, 3, 4];
 
 /** @param {string} code */
 export function marketPlaceLabel(code) {
@@ -42,25 +23,20 @@ export function marketPlaceLabel(code) {
 
 /** @param {number} status */
 export function leadStatusLabel(status) {
-  return LEAD_STATUS_LABELS[status] ?? `Trạng thái ${status}`;
+  const key = `orders.leadStatus.${status}`;
+  return i18n.exists(key) ? i18n.t(key) : i18n.t('orders.leadStatus.other', { status });
 }
 
-/** @param {number | null} status */
+/** utils.SaleOrderStatus @param {number | null} status */
 export function saleOrderStatusLabel(status) {
   if (status === null || status === undefined) return '—';
-  return SALE_ORDER_STATUS_LABELS[status] ?? String(status);
+  return i18n.t(`orders.saleOrderStatus.${status}`, { defaultValue: String(status) });
 }
 
-/** @param {number} method */
+/** utils.PAYMENT_METHOD_* @param {number} method */
 export function paymentMethodLabel(method) {
-  return PAYMENT_METHOD_LABELS[method] ?? (method ? String(method) : '—');
-}
-
-const vnd = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
-
-/** @param {number} amount */
-export function formatMoney(amount) {
-  return vnd.format(Number(amount) || 0);
+  if (!method) return '—';
+  return i18n.t(`orders.paymentMethod.${method}`, { defaultValue: String(method) });
 }
 
 /** The marketplace order id, or the internal id for sheet imports without one. */

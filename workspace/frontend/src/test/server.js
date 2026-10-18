@@ -13,6 +13,17 @@ const roleRef = (code) => {
   return { code: r.code, name: r.name };
 };
 
+// What the backend's i18n catalog returns for the signed-in user's locale (EC-7).
+const EN_ROLE_NAMES = { admin: 'Administrator', operator: 'Operator', viewer: 'Viewer' };
+const PERMISSION_NAMES = {
+  vi: { 'users.read': 'Xem người dùng', 'users.manage': 'Quản lý người dùng', 'orders.read': 'Xem đơn hàng', 'orders.detail': 'Xem chi tiết đơn hàng', 'orders.write': 'Cập nhật đơn hàng' },
+  en: { 'users.read': 'View users', 'users.manage': 'Manage users', 'orders.read': 'View orders', 'orders.detail': 'View order details', 'orders.write': 'Update orders' },
+};
+const localizedRef = (ref) => (backend.locale === 'en' ? { ...ref, name: EN_ROLE_NAMES[ref.code] ?? ref.name } : ref);
+const permissionNames = (codes) => Object.fromEntries(codes.map((c) => [c, PERMISSION_NAMES[backend.locale][c] ?? c]));
+const localizedRoles = () =>
+  ROLES.map((r) => ({ ...r, ...localizedRef({ code: r.code, name: r.name }), permission_names: permissionNames(r.permissions) }));
+
 export const testUser = {
   id: 7,
   email: 'an.nguyen@mq.com',
@@ -40,10 +51,17 @@ export const backend = {
   orders: [],
   lastOrdersQuery: null, // URLSearchParams object of the last GET /orders, as a plain object
   ordersError: null, // error code returned by GET /orders and /orders/:id
+  locale: 'vi', // testUser's saved UI language (user_config.locale)
+  localeError: null, // error code returned by PUT /auth/me/locale
+  localeCalls: [], // bodies of PUT /auth/me/locale
+  acceptLanguage: null, // Accept-Language of the last request
 };
 
-/** Counts localStorage/sessionStorage writes; the app must never make any. */
-export const storageWrites = { count: 0 };
+/**
+ * localStorage/sessionStorage writes. `count`: anything other than the UI
+ * language, which the app must never make; `language`: the last language code stored.
+ */
+export const storageWrites = { count: 0, language: null };
 
 export function resetBackend() {
   Object.assign(backend, {
@@ -63,6 +81,10 @@ export function resetBackend() {
     orders: makeOrders(),
     lastOrdersQuery: null,
     ordersError: null,
+    locale: 'vi',
+    localeError: null,
+    localeCalls: [],
+    acceptLanguage: null,
     users: [
       managed({ id: 7, email: 'an.nguyen@mq.com', display_name: 'An Nguyen', role: 'admin' }),
       managed({ id: 8, email: 'op@mq.com', display_name: 'Operator', role: 'operator' }),
@@ -75,11 +97,16 @@ function managed({ id, email, display_name, role, status = 'active', has_passwor
   return { id, email, display_name, avatar_url: null, status, role: roleRef(role), has_password, google_linked, locked_until: null, last_login_at: null, created_at: '2026-10-01T00:00:00Z' };
 }
 
-const me = () => ({
-  ...testUser,
-  role: roleRef(backend.role),
-  permissions: ROLES.find((r) => r.code === backend.role).permissions.filter((p) => !backend.withoutPermissions.includes(p)),
-});
+const me = () => {
+  const permissions = ROLES.find((r) => r.code === backend.role).permissions.filter((p) => !backend.withoutPermissions.includes(p));
+  return {
+    ...testUser,
+    role: localizedRef(roleRef(backend.role)),
+    permissions,
+    permission_names: permissionNames(permissions),
+    locale: backend.locale,
+  };
+};
 const can = (perm) => backend.signedIn && me().permissions.includes(perm);
 
 /**
@@ -153,7 +180,20 @@ const fail = (code, message) => HttpResponse.json({ code, message });
 const guard = (perm) => (!backend.signedIn ? fail(401, 'UNAUTHENTICATED') : !can(perm) ? fail(403, 'FORBIDDEN') : null);
 
 export const server = setupServer(
+  http.all('*/api/v1/*', ({ request }) => {
+    backend.acceptLanguage = request.headers.get('Accept-Language');
+    // no response: fall through to the matching handler below
+  }),
   http.get('*/api/v1/auth/providers', () => ok({ google: backend.google, password: true })),
+  http.put('*/api/v1/auth/me/locale', async ({ request }) => {
+    if (!backend.signedIn) return fail(401, 'UNAUTHENTICATED');
+    const body = await request.json();
+    backend.localeCalls.push(body);
+    if (backend.localeError) return fail(500, backend.localeError);
+    if (!['vi', 'en'].includes(body.locale)) return fail(400, 'INVALID_REQUEST');
+    backend.locale = body.locale;
+    return ok(me());
+  }),
   http.get('*/api/v1/auth/me', () => (backend.signedIn ? ok(me()) : fail(401, 'UNAUTHENTICATED'))),
   http.post('*/api/v1/auth/login', async ({ request }) => {
     backend.lastLoginBody = await request.json();
@@ -199,8 +239,8 @@ export const server = setupServer(
     return order ? ok({ order }) : fail(404, 'NOT_FOUND');
   }),
 
-  http.get('*/api/v1/roles', () => guard('users.read') ?? ok({ roles: ROLES })),
-  http.get('*/api/v1/users', () => guard('users.read') ?? ok({ users: backend.users })),
+  http.get('*/api/v1/roles', () => guard('users.read') ?? ok({ roles: localizedRoles() })),
+  http.get('*/api/v1/users', () => guard('users.read') ?? ok({ users: backend.users.map((u) => ({ ...u, role: localizedRef(u.role) })) })),
   http.post('*/api/v1/users', async ({ request }) => {
     const denied = guard('users.manage');
     if (denied) return denied;

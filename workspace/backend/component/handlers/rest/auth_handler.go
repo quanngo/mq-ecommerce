@@ -4,6 +4,7 @@ import (
 	"main/component/api"
 	"main/component/models"
 	"main/component/services"
+	"main/i18n"
 	"main/middleware"
 	"main/utils"
 	"net/http"
@@ -28,6 +29,7 @@ func (h *AuthHandler) Router(r *gin.RouterGroup, requireAuth, sameOrigin gin.Han
 	r.GET("google/callback", h.GoogleCallback)
 	r.POST("login", sameOrigin, h.PasswordLogin)
 	r.GET("me", requireAuth, h.Me)
+	r.PUT("me/locale", sameOrigin, requireAuth, h.SetLocale)
 	r.POST("logout", sameOrigin, h.Logout)
 	r.POST("logout-all", sameOrigin, requireAuth, h.LogoutAll)
 	r.POST("change-password", sameOrigin, requireAuth, h.ChangePassword)
@@ -106,7 +108,8 @@ func (h *AuthHandler) PasswordLogin(c *gin.Context) {
 	}
 	h.setSessionCookie(c, session)
 	noStore(c)
-	api.Ok(c, models.NewUserResponse(session.User))
+	i18n.Set(c, session.User.Locale) // from now on the account's language applies
+	api.Ok(c, userResponse(c, session.User))
 }
 
 // Me godoc
@@ -122,7 +125,33 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 	noStore(c)
-	api.Ok(c, models.NewUserResponse(*user))
+	api.Ok(c, userResponse(c, *user))
+}
+
+// SetLocale godoc
+// @Summary  Change the signed-in user's UI language (vi | en); the response is already in the new language
+// @Tags     auth
+// @Accept   json
+// @Produce  json
+// @Param    body body models.SetLocaleRequest true "language"
+// @Success  200 {object} models.UserResponse
+// @Router   /v1/auth/me/locale [put]
+func (h *AuthHandler) SetLocale(c *gin.Context) {
+	var req models.SetLocaleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.respondError(c, services.ErrInvalidRequest)
+		return
+	}
+	user := middleware.CurrentUser(c)
+	if err := h.AuthSvc.SetLocale(c.Request.Context(), user, req.Locale); err != nil {
+		h.respondError(c, err)
+		return
+	}
+	updated := *user
+	updated.Locale = req.Locale
+	i18n.Set(c, req.Locale)
+	noStore(c)
+	api.Ok(c, userResponse(c, updated))
 }
 
 // Logout godoc

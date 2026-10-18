@@ -56,6 +56,15 @@ func (f *fakeUsers) SetPassword(_ context.Context, id int64, hash string) error 
 	return nil
 }
 
+func (f *fakeUsers) SetLocale(_ context.Context, id int64, locale string) error {
+	u, ok := f.byID[id]
+	if !ok {
+		return errors.New("no such user")
+	}
+	u.Locale = locale
+	return nil
+}
+
 func (f *fakeUsers) GetByEmail(_ context.Context, email string) (*models.AppUser, error) {
 	for _, u := range f.byID {
 		if u.Email == email {

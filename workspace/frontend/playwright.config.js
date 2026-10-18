@@ -8,6 +8,8 @@ export default defineConfig({
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8088',
     trace: 'retain-on-failure',
+    // The specs read Vietnamese text; a fresh browser picks the UI language from this.
+    locale: 'vi-VN',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {

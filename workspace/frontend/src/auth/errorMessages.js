@@ -1,74 +1,75 @@
-// Backend error codes (services/auth_errors.go) -> what the user reads.
-const MESSAGES = {
-  INVALID_CREDENTIALS: 'Email hoặc mật khẩu không đúng.',
-  ACCOUNT_LOCKED: 'Tài khoản tạm khoá do đăng nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.',
-  INVALID_REQUEST: 'Vui lòng nhập email hợp lệ và mật khẩu.',
-  CONSENT_DENIED: 'Bạn đã huỷ đăng nhập bằng Google.',
-  DOMAIN_NOT_ALLOWED: 'Chỉ tài khoản Google @mq.com được phép đăng nhập.',
-  USER_NOT_ALLOWED: 'Tài khoản chưa được cấp quyền truy cập. Vui lòng liên hệ quản trị viên.',
-  EMAIL_NOT_VERIFIED: 'Email Google của bạn chưa được xác minh.',
-  INVALID_STATE: 'Phiên đăng nhập đã hết hạn. Vui lòng thử lại.',
-  GOOGLE_DISABLED: 'Đăng nhập bằng Google hiện không khả dụng.',
-  FORBIDDEN_ORIGIN: 'Yêu cầu không hợp lệ. Vui lòng tải lại trang.',
-  NETWORK_ERROR: 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.',
-  EXCHANGE_FAILED: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
-  INVALID_ID_TOKEN: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
-  INTERNAL_ERROR: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
-};
+// Backend error codes (services/auth_errors.go) -> what the user reads, in the
+// current UI language. Wording lives in src/locales/*.json under errors.<context>.
+//
+// Lookup order: this page's own wording (errors.<context>.<CODE>), then the
+// shared action wording, then the text the backend sent in the user's
+// language (`error_text`, see ApiError.errorText), then a generic message.
+// Call these during render (not when the error happens), so a language
+// switch re-translates a message that is already on screen.
 
-// Codes from user management, password changes and permission checks.
-const ACTION_MESSAGES = {
-  FORBIDDEN: 'Bạn không có quyền thực hiện thao tác này.',
-  NOT_FOUND: 'Không tìm thấy người dùng.',
-  WEAK_PASSWORD: 'Mật khẩu mới quá ngắn (hoặc trùng mật khẩu cũ).',
-  WRONG_PASSWORD: 'Mật khẩu hiện tại không đúng.',
-  EMAIL_TAKEN: 'Email này đã có tài khoản.',
-  INVALID_ROLE: 'Vai trò không hợp lệ.',
-  LAST_ADMIN: 'Không thể thực hiện: đây là quản trị viên cuối cùng có quyền quản lý người dùng.',
-  CANNOT_MODIFY_SELF: 'Bạn không thể tự đổi vai trò, khoá hoặc đặt lại mật khẩu của chính mình ở đây.',
-  INVALID_REQUEST: 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.',
-  NETWORK_ERROR: 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.',
-};
+import i18n from '../i18n';
+
+/**
+ * @param {unknown} err  ApiError, an error code string, or null
+ * @returns {{ code: string | null, backendText: string | null }}
+ */
+function parse(err) {
+  if (typeof err === 'string') return { code: err, backendText: null };
+  if (err && typeof err === 'object') return { code: err.errorCode ?? null, backendText: err.errorText || null };
+  return { code: null, backendText: null };
+}
+
+/**
+ * @param {('login' | 'action' | 'order')[]} contexts  most specific first
+ * @param {unknown} err
+ */
+function describe(contexts, err) {
+  const { code, backendText } = parse(err);
+  if (code) {
+    for (const ctx of contexts) {
+      const key = `errors.${ctx}.${code}`;
+      if (i18n.exists(key)) return i18n.t(key);
+    }
+  }
+  return backendText ?? i18n.t('errors.generic');
+}
+
+/**
+ * Message for a login error (password form or ?error=CODE from the Google callback).
+ * @param {unknown} err  ApiError or error code
+ * @returns {string | null} null when there is nothing to show
+ */
+export function authErrorMessage(err) {
+  const { code } = parse(err);
+  if (!code || code === 'UNAUTHENTICATED') return null;
+  return describe(['login'], err);
+}
 
 /**
  * Message for an error from a non-login action (user management, password change).
- * @param {string | null | undefined} code
+ * @param {unknown} err  ApiError, error code or null
  * @returns {string}
  */
-export function actionErrorMessage(code) {
-  return ACTION_MESSAGES[code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+export function actionErrorMessage(err) {
+  return describe(['action'], err);
 }
-
-// Codes from the Orders pages that read differently from user management.
-const ORDER_MESSAGES = {
-  NOT_FOUND: 'Không tìm thấy đơn hàng.',
-  INVALID_REQUEST: 'Bộ lọc không hợp lệ. Kiểm tra lại ngày (từ ngày phải trước đến ngày) và từ khoá.',
-  FORBIDDEN: 'Bạn không có quyền xem nội dung này.',
-};
 
 /**
  * Message for an error from the Orders pages.
- * @param {string | null | undefined} code
+ * @param {unknown} err  ApiError, error code or null
  * @returns {string}
  */
-export function orderErrorMessage(code) {
-  return ORDER_MESSAGES[code] ?? actionErrorMessage(code);
+export function orderErrorMessage(err) {
+  return describe(['order', 'action'], err);
 }
 
-/** Vietnamese labels for permission codes (models.Perm* in the backend). */
-export const PERMISSION_LABELS = {
-  'users.read': 'Xem người dùng',
-  'users.manage': 'Quản lý người dùng',
-  'orders.read': 'Xem đơn hàng',
-  'orders.detail': 'Xem chi tiết đơn hàng',
-  'orders.write': 'Cập nhật đơn hàng',
-};
-
 /**
- * @param {string | null | undefined} code
- * @returns {string | null}
+ * Label of a permission code (models.Perm* in the backend). The backend sends
+ * translated names (`permission_names` on /auth/me and /roles); the local
+ * catalog covers anything it didn't send.
+ * @param {string} code  e.g. "orders.read"
+ * @param {Record<string, string> | undefined} [names]
  */
-export function authErrorMessage(code) {
-  if (!code || code === 'UNAUTHENTICATED') return null;
-  return MESSAGES[code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+export function permissionLabel(code, names) {
+  return names?.[code] || i18n.t(`permissions.${code}`, { defaultValue: code });
 }

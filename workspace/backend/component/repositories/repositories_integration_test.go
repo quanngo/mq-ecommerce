@@ -30,7 +30,7 @@ var allTables = []string{
 	"public.log_order_status", "public.ecom_statement_transaction",
 	"public.ecom_order_item", "public.ecom_order",
 	"public.od_ecom_order", "public.od_do_new", "public.od_sale_order",
-	"public.user_session", "public.oauth_login_attempt", "public.app_user",
+	"public.user_session", "public.oauth_login_attempt", "public.user_config", "public.app_user",
 }
 
 func testDB(t *testing.T) *sqlx.DB {
@@ -554,5 +554,65 @@ func TestRBACRepos(t *testing.T) {
 	}
 	if err := users.SetPassword(ctx, viewerID, "$2a$04$x"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestUserLocale(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	users, sessions := NewUserRepo(db), NewSessionRepo(db)
+
+	defID, err := users.Create(ctx, models.AppUser{Email: "vi@mq.com"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	enID, err := users.Create(ctx, models.AppUser{Email: "en@mq.com", Locale: "en"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := users.GetByID(ctx, defID); u == nil || u.Locale != "vi" {
+		t.Errorf("default locale = %+v (is migration 006 applied?)", u)
+	}
+	if u, _ := users.GetByID(ctx, enID); u == nil || u.Locale != "en" {
+		t.Errorf("created locale = %+v", u)
+	}
+
+	if err := users.SetLocale(ctx, defID, "en"); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("b", 64)
+	sessions.Create(ctx, hash, defID, models.AuthMethodPassword, time.Now().Add(time.Hour), "", "")
+	if su, err := sessions.GetValid(ctx, hash); err != nil || su == nil || su.Locale != "en" {
+		t.Errorf("session user locale = %+v, %v", su, err)
+	}
+
+	if err := users.SetLocale(ctx, defID, "fr"); err == nil {
+		t.Error("unsupported locale stored; ck_user_config_locale missing?")
+	}
+
+	// 1-1: Create wrote exactly one user_config row per user.
+	var rows int
+	if err := db.Get(&rows, `SELECT COUNT(*) FROM public.user_config WHERE user_id IN ($1, $2)`, defID, enID); err != nil || rows != 2 {
+		t.Errorf("user_config rows = %d, %v", rows, err)
+	}
+
+	// A user without a row (created before migration 006) reads as vi, and
+	// SetLocale creates the row.
+	mustExec(t, db, `DELETE FROM public.user_config WHERE user_id = $1`, enID)
+	if u, _ := users.GetByID(ctx, enID); u == nil || u.Locale != "vi" {
+		t.Errorf("locale without user_config row = %+v", u)
+	}
+	if err := users.SetLocale(ctx, enID, "en"); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := users.GetByID(ctx, enID); u == nil || u.Locale != "en" {
+		t.Errorf("locale after upsert = %+v", u)
+	}
+
+	// Deleting the user deletes its settings.
+	mustExec(t, db, `DELETE FROM public.user_session WHERE user_id = $1`, defID)
+	mustExec(t, db, `DELETE FROM public.app_user WHERE id = $1`, defID)
+	if err := db.Get(&rows, `SELECT COUNT(*) FROM public.user_config WHERE user_id = $1`, defID); err != nil || rows != 0 {
+		t.Errorf("user_config rows after user delete = %d, %v", rows, err)
 	}
 }

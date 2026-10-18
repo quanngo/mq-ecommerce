@@ -8,6 +8,7 @@
 // by a local "consent" page. Dev only: nothing here is used by the real app.
 
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createServer as createVite } from 'vite';
@@ -25,13 +26,29 @@ const ROLES = [
 ];
 const MIN_PASSWORD = 10;
 
+// Role and permission names in the user's language, from the backend's own
+// catalogs (workspace/backend/i18n/locales), like the real API (EC-7).
+const CATALOGS = Object.fromEntries(
+  ['vi', 'en'].map((l) => [l, JSON.parse(readFileSync(new URL(`../../backend/i18n/locales/${l}.json`, import.meta.url), 'utf8'))]),
+);
+const tr = (lang, key, fallback) => CATALOGS[lang]?.[key] ?? CATALOGS.vi[key] ?? fallback;
+const roleRef = (role, lang) => ({ code: role.code, name: tr(lang, `role.${role.code}.name`, role.name) });
+const permissionNames = (codes, lang) => Object.fromEntries(codes.map((c) => [c, tr(lang, `permission.${c}`, c)]));
+const localizedRoles = (lang) =>
+  ROLES.map((r) => ({
+    ...r,
+    ...roleRef(r, lang),
+    description: tr(lang, `role.${r.code}.description`, r.description),
+    permission_names: permissionNames(r.permissions, lang),
+  }));
+
 let nextId = 4;
 const users = [
   // Default admin seeded by migrations/004 (same credentials as the real backend).
   { id: 1, email: 'admin@mq.com', password: '123456', display_name: 'Administrator', role: 'admin', google: false },
   { id: 2, email: 'demo@mq.com', password: 'demo-password', display_name: 'Demo User', role: 'operator', google: false },
   { id: 3, email: 'google.user@mq.com', password: null, display_name: 'Nguyễn Văn Google', role: 'viewer', google: true },
-].map((u) => ({ ...u, avatar_url: null, status: 'active', failed: 0, lockedUntil: 0, last_login_at: null, created_at: new Date().toISOString() }));
+].map((u) => ({ ...u, avatar_url: null, status: 'active', locale: 'vi', failed: 0, lockedUntil: 0, last_login_at: null, created_at: new Date().toISOString() }));
 
 const sessions = new Map(); // token -> { userId, method }
 
@@ -122,12 +139,15 @@ const userResponse = (user, method) => ({
   avatar_url: user.avatar_url,
   auth_method: method,
   last_login_at: user.last_login_at,
-  role: { code: roleOf(user).code, name: roleOf(user).name },
+  role: roleRef(roleOf(user), user.locale),
   permissions: roleOf(user).permissions,
+  permission_names: permissionNames(roleOf(user).permissions, user.locale),
+  locale: user.locale,
 });
-const managed = (u) => ({
+// lang: the signed-in viewer's language (role names are translated for them).
+const managed = (u, lang = 'vi') => ({
   id: u.id, email: u.email, display_name: u.display_name, avatar_url: u.avatar_url, status: u.status,
-  role: { code: roleOf(u).code, name: roleOf(u).name }, has_password: !!u.password, google_linked: u.google,
+  role: roleRef(roleOf(u), lang), has_password: !!u.password, google_linked: u.google,
   locked_until: u.lockedUntil > Date.now() ? new Date(u.lockedUntil).toISOString() : null,
   last_login_at: u.last_login_at, created_at: u.created_at,
 });
@@ -229,6 +249,15 @@ const mock = http.createServer(async (req, res) => {
       return s ? ok(res, userResponse(s.user, s.method)) : fail(res, 401, 'UNAUTHENTICATED');
     }
 
+    case 'PUT /api/v1/auth/me/locale': {
+      const s = sessionUser(req);
+      if (!s) return fail(res, 401, 'UNAUTHENTICATED');
+      const body = (await readJson(req)) ?? {};
+      if (!['vi', 'en'].includes(body.locale)) return fail(res, 400, 'INVALID_REQUEST');
+      s.user.locale = body.locale;
+      return ok(res, userResponse(s.user, s.method));
+    }
+
     case 'POST /api/v1/auth/logout-all': {
       const s = sessionUser(req);
       if (!s) return fail(res, 401, 'UNAUTHENTICATED');
@@ -271,8 +300,8 @@ const mock = http.createServer(async (req, res) => {
       const perms = roleOf(s.user).permissions;
       const write = req.method !== 'GET';
       if (!perms.includes(write ? 'users.manage' : 'users.read')) return fail(res, 403, 'FORBIDDEN');
-      if (route === 'GET /api/v1/roles') return ok(res, { roles: ROLES });
-      if (route === 'GET /api/v1/users') return ok(res, { users: [...users].reverse().map(managed) });
+      if (route === 'GET /api/v1/roles') return ok(res, { roles: localizedRoles(s.user.locale) });
+      if (route === 'GET /api/v1/users') return ok(res, { users: [...users].reverse().map((u) => managed(u, s.user.locale)) });
 
       const body = (await readJson(req)) ?? {};
       if (route === 'POST /api/v1/users') {
@@ -283,10 +312,10 @@ const mock = http.createServer(async (req, res) => {
         if ('password' in body && (body.password ?? '').length < MIN_PASSWORD) return fail(res, 400, 'WEAK_PASSWORD');
         const u = {
           id: nextId++, email, password: body.password ?? null, display_name: (body.display_name ?? '').trim(), role: body.role, google: false,
-          avatar_url: null, status: 'active', failed: 0, lockedUntil: 0, last_login_at: null, created_at: new Date().toISOString(),
+          avatar_url: null, status: 'active', locale: 'vi', failed: 0, lockedUntil: 0, last_login_at: null, created_at: new Date().toISOString(),
         };
         users.push(u);
-        return ok(res, managed(u));
+        return ok(res, managed(u, s.user.locale));
       }
 
       const target = users.find((u) => u.id === targetId);
@@ -314,7 +343,7 @@ const mock = http.createServer(async (req, res) => {
         target.status = body.status;
         if (body.status === 'disabled') revokeAll(target.id);
       }
-      return ok(res, managed(target));
+      return ok(res, managed(target, s.user.locale));
     }
 
     case 'GET /api/v1/orders':

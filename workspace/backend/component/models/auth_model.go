@@ -35,6 +35,7 @@ type AppUser struct {
 	CreatedAt        time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time  `db:"updated_at" json:"updated_at"`
 	RoleID           int64      `db:"role_id" json:"-"`
+	Locale           string     `db:"locale" json:"locale"` // preferred UI language from public.user_config, one of i18n.Supported (EC-7)
 }
 
 // SessionUser is the signed-in user of a request, as put in the gin context by
@@ -92,6 +93,7 @@ func NewUserResponse(u SessionUser) UserResponse {
 		LastLoginAt: u.LastLoginAt,
 		Role:        RoleRef{Code: u.RoleCode, Name: u.RoleName},
 		Permissions: nonNil(u.Permissions),
+		Locale:      u.Locale,
 	}
 }
 
@@ -110,6 +112,14 @@ type UserResponse struct {
 	LastLoginAt *time.Time `json:"last_login_at"`
 	Role        RoleRef    `json:"role"`
 	Permissions []string   `json:"permissions"`
+	// PermissionNames translates each permission code into the request's language.
+	PermissionNames map[string]string `json:"permission_names"`
+	Locale          string            `json:"locale"`
+}
+
+// SetLocaleRequest is the body of PUT /auth/me/locale.
+type SetLocaleRequest struct {
+	Locale string `json:"locale" binding:"required,max=8"`
 }
 
 type ProvidersResponse struct {
@@ -152,6 +162,8 @@ type Role struct {
 	Description string         `db:"description" json:"description"`
 	IsSystem    bool           `db:"is_system" json:"is_system"`
 	Permissions pq.StringArray `db:"permissions" json:"permissions" swaggertype:"array,string"`
+	// PermissionNames translates each permission code into the request's language.
+	PermissionNames map[string]string `db:"-" json:"permission_names"`
 }
 
 // ---------- user management ----------

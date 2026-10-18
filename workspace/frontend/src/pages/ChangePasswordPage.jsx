@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { authApi } from '../api/auth';
 import { ApiError } from '../api/client';
@@ -10,6 +11,7 @@ import ui from './ui.module.css';
 export const MIN_PASSWORD_LENGTH = 10; // auth.min-password-length on the backend (default)
 
 export function ChangePasswordPage() {
+  const { t } = useTranslation();
   const { state } = useAuth();
   // A Google sign-in may belong to an account without a password yet; the
   // backend then accepts an empty current password and sets the first one.
@@ -38,7 +40,7 @@ export function ChangePasswordPage() {
       setNext('');
       setConfirm('');
     } catch (err) {
-      setError(actionErrorMessage(err instanceof ApiError ? err.errorCode : null));
+      setError(err instanceof ApiError ? err : 'INTERNAL_ERROR');
       setCurrent('');
     } finally {
       setBusy(false);
@@ -47,23 +49,23 @@ export function ChangePasswordPage() {
 
   return (
     <main className={`${ui.main} ${ui.narrow}`}>
-      <h1 className={ui.title}>Đổi mật khẩu</h1>
+      <h1 className={ui.title}>{t('changePassword.title')}</h1>
 
       {done && (
         <div className={ui.success} role="status">
-          Đã đổi mật khẩu. Các thiết bị khác đã bị đăng xuất.
+          {t('changePassword.done')}
         </div>
       )}
       {error && (
         <div className={ui.error} role="alert">
-          {error}
+          {actionErrorMessage(error)}
         </div>
       )}
 
       <form className={`${ui.card} ${ui.form}`} onSubmit={onSubmit} noValidate>
         <PasswordField
-          label="Mật khẩu hiện tại"
-          hint={googleSession ? 'Bỏ trống nếu tài khoản của bạn chưa từng có mật khẩu (chỉ đăng nhập Google).' : null}
+          label={t('changePassword.current')}
+          hint={googleSession ? t('changePassword.currentGoogleHint') : null}
           className={ui.label}
           inputClassName={ui.input}
           autoComplete="current-password"
@@ -71,8 +73,8 @@ export function ChangePasswordPage() {
           onChange={(e) => setCurrent(e.target.value)}
         />
         <PasswordField
-          label="Mật khẩu mới"
-          hint={`Tối thiểu ${MIN_PASSWORD_LENGTH} ký tự.`}
+          label={t('changePassword.new')}
+          hint={t('password.minLength', { count: MIN_PASSWORD_LENGTH })}
           className={ui.label}
           inputClassName={ui.input}
           autoComplete="new-password"
@@ -81,7 +83,7 @@ export function ChangePasswordPage() {
           aria-invalid={tooShort}
         />
         <PasswordField
-          label="Nhập lại mật khẩu mới"
+          label={t('changePassword.confirm')}
           className={ui.label}
           inputClassName={ui.input}
           autoComplete="new-password"
@@ -90,18 +92,18 @@ export function ChangePasswordPage() {
           aria-invalid={mismatch}
           describedBy={mismatch ? 'confirm-mismatch' : undefined}
         />
-        {/* Outside the field, so its accessible name stays "Nhập lại mật khẩu mới". */}
+        {/* Outside the field, so its accessible name stays just the label. */}
         {mismatch && (
           <span id="confirm-mismatch" className={ui.hint}>
-            Mật khẩu nhập lại không khớp.
+            {t('changePassword.mismatch')}
           </span>
         )}
         <div className={ui.actions}>
           <Link to="/profile" className={ui.secondaryButton}>
-            Quay lại
+            {t('common.back')}
           </Link>
           <button className={ui.primaryButton} type="submit" disabled={!canSubmit}>
-            {busy ? 'Đang lưu…' : 'Đổi mật khẩu'}
+            {busy ? t('common.saving') : t('changePassword.submit')}
           </button>
         </div>
       </form>

@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import styles from './PasswordField.module.css';
 
 /**
@@ -18,6 +19,7 @@ import styles from './PasswordField.module.css';
  * All other props (value, onChange, autoComplete, name, required, aria-invalid…) go to the <input>.
  */
 export function PasswordField({ label, hint, className, inputClassName, describedBy, ...inputProps }) {
+  const { t } = useTranslation();
   const id = useId();
   const hintId = `${id}-hint`;
   const [visible, setVisible] = useState(false);
@@ -46,9 +48,9 @@ export function PasswordField({ label, hint, className, inputClassName, describe
           type="button"
           className={styles.toggle}
           onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          aria-label={visible ? t('password.hide') : t('password.show')}
           aria-controls={id}
-          title={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          title={visible ? t('password.hide') : t('password.show')}
         >
           {visible ? <EyeOffIcon /> : <EyeIcon />}
         </button>

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi, googleLoginUrl, safeNextPath } from '../api/auth';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { authErrorMessage } from '../auth/errorMessages';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { PasswordField } from './PasswordField';
 import { Spinner } from './Spinner';
 import styles from './LoginPage.module.css';
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const { state, login } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,7 +23,8 @@ export function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // ?error=CODE comes from the Google callback redirect; read it once, then drop it from the URL.
-  const [error, setError] = useState(() => authErrorMessage(searchParams.get('error')));
+  // The code (or ApiError) is kept and translated at render, so switching language re-translates it.
+  const [error, setError] = useState(() => searchParams.get('error'));
 
   useEffect(() => {
     if (searchParams.has('error')) {
@@ -37,7 +41,7 @@ export function LoginPage() {
       .catch(() => setProviders({ google: false, password: true }));
   }, []);
 
-  if (state.status === 'loading') return <Spinner label="Đang tải…" />;
+  if (state.status === 'loading') return <Spinner label={t('common.loading')} />;
   if (state.status === 'authenticated') return <Navigate to={next} replace />;
 
   async function onSubmit(e) {
@@ -48,35 +52,38 @@ export function LoginPage() {
       await login(email.trim(), password, rememberMe);
       navigate(next, { replace: true });
     } catch (err) {
-      setError(authErrorMessage(err instanceof ApiError ? err.errorCode : 'INTERNAL_ERROR'));
+      setError(err instanceof ApiError ? err : 'INTERNAL_ERROR');
       setPassword('');
     } finally {
       setSubmitting(false);
     }
   }
 
+  const errorMessage = authErrorMessage(error);
+
   return (
     <main className={styles.page}>
+      <LanguageSwitcher className={styles.language} />
       <section className={styles.card} aria-labelledby="login-title">
         <header className={styles.header}>
           <span className={styles.logo} aria-hidden="true">
             MQ
           </span>
           <h1 id="login-title" className={styles.title}>
-            Đăng nhập
+            {t('login.title')}
           </h1>
-          <p className={styles.subtitle}>MQ E-commerce Admin</p>
+          <p className={styles.subtitle}>{t('common.appName')}</p>
         </header>
 
-        {error && (
+        {errorMessage && (
           <div className={styles.error} role="alert">
-            {error}
+            {errorMessage}
           </div>
         )}
 
         <form className={styles.form} onSubmit={onSubmit} noValidate>
           <label className={styles.label}>
-            Email
+            {t('login.email')}
             <input
               className={styles.input}
               type="email"
@@ -86,11 +93,11 @@ export function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="ten@mq.com"
+              placeholder={t('login.emailPlaceholder')}
             />
           </label>
           <PasswordField
-            label="Mật khẩu"
+            label={t('login.password')}
             className={styles.label}
             inputClassName={styles.input}
             name="password"
@@ -102,10 +109,10 @@ export function LoginPage() {
           {/* Applies to both the password form and the Google button below. */}
           <label className={styles.remember}>
             <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-            Ghi nhớ đăng nhập trong 7 ngày
+            {t('login.remember')}
           </label>
           <button className={styles.submit} type="submit" disabled={submitting || !email || !password}>
-            {submitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
+            {submitting ? t('login.submitting') : t('login.submit')}
           </button>
         </form>
 
@@ -114,21 +121,21 @@ export function LoginPage() {
         {providers && (
           <>
             <div className={styles.divider}>
-              <span>hoặc</span>
+              <span>{t('login.or')}</span>
             </div>
             {providers.google ? (
               <a className={styles.google} href={googleLoginUrl(next, rememberMe)}>
                 <GoogleIcon />
-                Đăng nhập với Google
+                {t('login.google')}
               </a>
             ) : (
               <>
                 <button className={styles.google} type="button" disabled aria-describedby="google-off">
                   <GoogleIcon />
-                  Đăng nhập với Google
+                  {t('login.google')}
                 </button>
                 <p id="google-off" className={styles.googleOff}>
-                  Đăng nhập Google chưa được cấu hình. Vui lòng dùng email và mật khẩu.
+                  {t('login.googleOff')}
                 </p>
               </>
             )}

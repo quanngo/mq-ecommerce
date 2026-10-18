@@ -15,7 +15,8 @@ Go 1.24 + Gin. Routes are registered in `component/handlers/rest/rest.go` (`APIR
 
 ## Conventions
 
-- **Envelope.** JSON endpoints always answer **HTTP 200** with `{code, message, data}` (`component/api/response.go`). `code` is the real status, `message` is `"Success"` or a stable error code (e.g. `FORBIDDEN`), and `data` is **an array**: the payload is `data[0]`. Errors have no `data`.
+- **Envelope.** JSON endpoints always answer **HTTP 200** with `{code, message, error_text?, data}` (`component/api/response.go`). `code` is the real status, `message` is `"Success"` or a stable error code (e.g. `FORBIDDEN`), and `data` is **an array**: the payload is `data[0]`. Errors have no `data`; they carry `error_text`, the error in the request's language (omitted when there is no text for the code or status). Clients switch on `message`, never on `error_text`.
+- **Language (EC-7).** Supported: `vi` (default) and `en`. A request's language is the signed-in user's saved `locale`; without a session, the best match in `Accept-Language`; otherwise `vi`. Responses send `Content-Language`. It translates `error_text` and role/permission names (`role.name`, `role.description`, `permission_names`); error codes and data never change. Catalogs: `i18n/locales/*.json`.
 - **Session.** Login sets the httpOnly cookie `ecom_session` (`auth.cookie-name`, `SameSite=Lax`). Endpoints marked *session* use `middleware.RequireAuth`; without a valid session they return `401 UNAUTHENTICATED`.
 - **Permissions.** Endpoints marked *permission X* use `middleware.RequirePermission`; a user whose role lacks X gets `403 FORBIDDEN`. Permission codes: `users.read`, `users.manage`, `orders.read`, `orders.detail`, `orders.write` (`migrations/004`, `005`).
 - **Same origin.** State-changing endpoints marked *same origin* use `middleware.RequireSameOrigin`: a request with an `Origin` header other than the origin of `auth.frontend-url` gets `403 FORBIDDEN_ORIGIN` (requests without `Origin` pass; `SameSite=Lax` covers those).
@@ -48,7 +49,7 @@ Go 1.24 + Gin. Routes are registered in `component/handlers/rest/rest.go` (`APIR
 - **Description**: Sign in with an internal email and password; sets `ecom_session`.
 - **Auth**: public, same origin
 - **Request**: body `{email: string (email, ≤320), password: string (≤256), remember_me?: bool}`
-- **Response**: 200, `data[0]` = `UserResponse` `{id, email, display_name, avatar_url, auth_method: "password"|"google", last_login_at, role: {code, name}, permissions: string[]}`
+- **Response**: 200, `data[0]` = `UserResponse` `{id, email, display_name, avatar_url, auth_method: "password"|"google", last_login_at, role: {code, name}, permissions: string[], permission_names: {code: name}, locale: "vi"|"en"}`. Role and permission names are in the account's `locale` (the response sends `Content-Language`).
 - **Errors**: `400 INVALID_REQUEST`, `401 INVALID_CREDENTIALS` (unknown email, wrong password, Google-only or disabled account), `423 ACCOUNT_LOCKED`, `403 FORBIDDEN_ORIGIN`
 
 ### GET /auth/me
@@ -56,6 +57,13 @@ Go 1.24 + Gin. Routes are registered in `component/handlers/rest/rest.go` (`APIR
 - **Auth**: session
 - **Response**: 200, `data[0]` = `UserResponse` (as above)
 - **Errors**: `401 UNAUTHENTICATED`
+
+### PUT /auth/me/locale
+- **Description**: Saves the signed-in user's UI language (`user_config.locale`, a 1-1 table next to `app_user`, migration `006`). From the next request on, the backend answers in it.
+- **Auth**: session, same origin
+- **Request**: body `{locale: "vi" | "en"}` (exact code)
+- **Response**: 200, `data[0]` = `UserResponse` already in the new language
+- **Errors**: `400 INVALID_REQUEST` (missing or unsupported locale), `401 UNAUTHENTICATED`, `403 FORBIDDEN_ORIGIN`
 
 ### POST /auth/logout
 - **Description**: Revokes this browser's session and clears the cookie.
@@ -83,13 +91,13 @@ Mounted only when `UserAdminService` is wired (`server/base.go`).
 ### GET /users
 - **Description**: All users for the user-management page.
 - **Auth**: session, permission `users.read`
-- **Response**: 200, `data[0]` = `{users: ManagedUser[]}`; `ManagedUser` = `{id, email, display_name, avatar_url, status: "active"|"disabled", role: {code, name}, has_password, google_linked, locked_until, last_login_at, created_at}`
+- **Response**: 200, `data[0]` = `{users: ManagedUser[]}`; `ManagedUser` = `{id, email, display_name, avatar_url, status: "active"|"disabled", role: {code, name}, has_password, google_linked, locked_until, last_login_at, created_at}`; `role.name` is in the request's language
 - **Errors**: `401 UNAUTHENTICATED`, `403 FORBIDDEN`
 
 ### GET /roles
 - **Description**: Roles and their permission codes.
 - **Auth**: session, permission `users.read`
-- **Response**: 200, `data[0]` = `{roles: [{code, name, description, is_system, permissions: string[]}]}`
+- **Response**: 200, `data[0]` = `{roles: [{code, name, description, is_system, permissions: string[], permission_names: {code: name}}]}`; names and descriptions are in the request's language (roles without a catalog entry keep the text stored in the DB)
 - **Errors**: `401 UNAUTHENTICATED`, `403 FORBIDDEN`
 
 ### POST /users

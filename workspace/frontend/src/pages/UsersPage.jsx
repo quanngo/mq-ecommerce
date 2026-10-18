@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client';
 import { usersApi } from '../api/users';
 import { useAuth } from '../auth/AuthContext';
-import { actionErrorMessage, PERMISSION_LABELS } from '../auth/errorMessages';
+import { actionErrorMessage, permissionLabel } from '../auth/errorMessages';
+import { formatDateTime } from '../i18n/format';
 import { MIN_PASSWORD_LENGTH } from './ChangePasswordPage';
 import { Modal } from './Modal';
 import { PasswordField } from './PasswordField';
-import { formatDateTime } from './ProfilePage';
 import { Spinner } from './Spinner';
 import styles from './UsersPage.module.css';
 import ui from './ui.module.css';
 
-const errorText = (err) => actionErrorMessage(err instanceof ApiError ? err.errorCode : null);
+// Errors and notices are kept untranslated (ApiError / {key, params}) and
+// translated at render, so switching language re-translates them.
+const asError = (err) => (err instanceof ApiError ? err : 'INTERNAL_ERROR');
 
 export function UsersPage() {
+  const { t, i18n } = useTranslation();
   const { state, can } = useAuth();
   const canManage = can('users.manage');
   const me = state.user?.id;
@@ -21,7 +25,7 @@ export function UsersPage() {
   const [users, setUsers] = useState(null);
   const [roles, setRoles] = useState([]);
   const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
+  const [notice, setNotice] = useState(null); // { key, params } | null
   const [savingId, setSavingId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [resetting, setResetting] = useState(null); // ManagedUser | null
@@ -32,26 +36,27 @@ export function UsersPage() {
       setUsers(u);
       setRoles(r);
     } catch (err) {
-      setError(errorText(err));
+      setError(asError(err));
       setUsers([]);
     }
   }, []);
 
+  // Role and permission names come translated from the backend: reload them in the new language.
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, i18n.language]);
 
   const replaceUser = (updated) => setUsers((list) => list.map((u) => (u.id === updated.id ? updated : u)));
 
-  async function change(user, changes, successText) {
+  async function change(user, changes, successNotice) {
     setError(null);
     setNotice(null);
     setSavingId(user.id);
     try {
       replaceUser(await usersApi.update(user.id, changes));
-      setNotice(successText);
+      setNotice(successNotice);
     } catch (err) {
-      setError(errorText(err));
+      setError(asError(err));
     } finally {
       setSavingId(null);
     }
@@ -60,27 +65,27 @@ export function UsersPage() {
   const closeCreate = useCallback(() => setCreating(false), []);
   const closeReset = useCallback(() => setResetting(null), []);
 
-  if (users === null) return <Spinner label="Đang tải danh sách người dùng…" />;
+  if (users === null) return <Spinner label={t('users.loading')} />;
 
   return (
     <main className={ui.main}>
       <div className={styles.header}>
-        <h1 className={ui.title}>Người dùng</h1>
+        <h1 className={ui.title}>{t('users.title')}</h1>
         {canManage && (
           <button className={ui.primaryButton} type="button" onClick={() => setCreating(true)}>
-            + Tạo người dùng
+            {t('users.create')}
           </button>
         )}
       </div>
 
       {error && (
         <div className={ui.error} role="alert">
-          {error}
+          {actionErrorMessage(error)}
         </div>
       )}
       {notice && (
         <div className={ui.success} role="status">
-          {notice}
+          {t(notice.key, notice.params)}
         </div>
       )}
 
@@ -88,12 +93,12 @@ export function UsersPage() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th scope="col">Người dùng</th>
-              <th scope="col">Vai trò</th>
-              <th scope="col">Đăng nhập bằng</th>
-              <th scope="col">Trạng thái</th>
-              <th scope="col">Đăng nhập gần nhất</th>
-              {canManage && <th scope="col" aria-label="Thao tác" />}
+              <th scope="col">{t('users.colUser')}</th>
+              <th scope="col">{t('users.colRole')}</th>
+              <th scope="col">{t('users.colMethod')}</th>
+              <th scope="col">{t('users.colStatus')}</th>
+              <th scope="col">{t('users.colLastLogin')}</th>
+              {canManage && <th scope="col" aria-label={t('users.colActions')} />}
             </tr>
           </thead>
           <tbody>
@@ -104,7 +109,7 @@ export function UsersPage() {
                 <tr key={u.id} aria-busy={saving}>
                   <td>
                     <div className={styles.userName}>
-                      {u.display_name || '—'} {isMe && <span className={ui.badgeMuted}>Bạn</span>}
+                      {u.display_name || '—'} {isMe && <span className={ui.badgeMuted}>{t('users.you')}</span>}
                     </div>
                     <div className={styles.userEmail}>{u.email}</div>
                   </td>
@@ -112,10 +117,10 @@ export function UsersPage() {
                     {canManage && !isMe ? (
                       <select
                         className={ui.select}
-                        aria-label={`Vai trò của ${u.email}`}
+                        aria-label={t('users.roleOf', { email: u.email })}
                         value={u.role.code}
                         disabled={saving}
-                        onChange={(e) => change(u, { role: e.target.value }, `Đã đổi vai trò của ${u.email}.`)}
+                        onChange={(e) => change(u, { role: e.target.value }, { key: 'users.roleChanged', params: { email: u.email } })}
                       >
                         {roles.map((r) => (
                           <option key={r.code} value={r.code}>
@@ -129,40 +134,44 @@ export function UsersPage() {
                   </td>
                   <td>
                     <div className={styles.methods}>
-                    {u.has_password && <span className={ui.badgeMuted}>Mật khẩu</span>}
-                    {u.google_linked && <span className={ui.badgeMuted}>Google</span>}
-                    {!u.has_password && !u.google_linked && <span className={ui.badgeMuted}>Google (chưa đăng nhập)</span>}
+                      {u.has_password && <span className={ui.badgeMuted}>{t('users.methodPassword')}</span>}
+                      {u.google_linked && <span className={ui.badgeMuted}>{t('users.methodGoogle')}</span>}
+                      {!u.has_password && !u.google_linked && <span className={ui.badgeMuted}>{t('users.methodGooglePending')}</span>}
                     </div>
                   </td>
                   <td>
-                    {u.status === 'active' ? <span className={ui.badgeMuted}>Hoạt động</span> : <span className={ui.badgeDanger}>Đã khoá</span>}
-                    {u.locked_until && <div className={styles.lockNote}>Tạm khoá đến {formatDateTime(u.locked_until)}</div>}
+                    {u.status === 'active' ? (
+                      <span className={ui.badgeMuted}>{t('users.active')}</span>
+                    ) : (
+                      <span className={ui.badgeDanger}>{t('users.disabled')}</span>
+                    )}
+                    {u.locked_until && <div className={styles.lockNote}>{t('users.lockedUntil', { time: formatDateTime(u.locked_until) })}</div>}
                   </td>
                   <td className={styles.when}>{formatDateTime(u.last_login_at)}</td>
                   {canManage && (
                     <td>
                       <div className={styles.rowActions}>
-                      {!isMe && (
-                        <>
-                          <button
-                            type="button"
-                            className={ui.secondaryButton}
-                            disabled={saving}
-                            onClick={() =>
-                              change(
-                                u,
-                                { status: u.status === 'active' ? 'disabled' : 'active' },
-                                u.status === 'active' ? `Đã khoá ${u.email}.` : `Đã mở khoá ${u.email}.`,
-                              )
-                            }
-                          >
-                            {u.status === 'active' ? 'Khoá' : 'Mở khoá'}
-                          </button>
-                          <button type="button" className={ui.secondaryButton} disabled={saving} onClick={() => setResetting(u)}>
-                            Đặt lại mật khẩu
-                          </button>
-                        </>
-                      )}
+                        {!isMe && (
+                          <>
+                            <button
+                              type="button"
+                              className={ui.secondaryButton}
+                              disabled={saving}
+                              onClick={() =>
+                                change(
+                                  u,
+                                  { status: u.status === 'active' ? 'disabled' : 'active' },
+                                  { key: u.status === 'active' ? 'users.disabledNotice' : 'users.enabledNotice', params: { email: u.email } },
+                                )
+                              }
+                            >
+                              {u.status === 'active' ? t('users.disable') : t('users.enable')}
+                            </button>
+                            <button type="button" className={ui.secondaryButton} disabled={saving} onClick={() => setResetting(u)}>
+                              {t('users.resetPassword')}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   )}
@@ -182,7 +191,7 @@ export function UsersPage() {
           onClose={closeCreate}
           onCreated={(u) => {
             setUsers((list) => [u, ...list]);
-            setNotice(`Đã tạo tài khoản ${u.email}.`);
+            setNotice({ key: 'users.created', params: { email: u.email } });
             setError(null);
             setCreating(false);
           }}
@@ -193,7 +202,7 @@ export function UsersPage() {
           user={resetting}
           onClose={closeReset}
           onDone={(u) => {
-            setNotice(`Đã đặt lại mật khẩu cho ${u.email}. Người dùng đã bị đăng xuất khỏi mọi thiết bị.`);
+            setNotice({ key: 'users.resetDone', params: { email: u.email } });
             setError(null);
             setResetting(null);
             load();
@@ -205,11 +214,12 @@ export function UsersPage() {
 }
 
 function RolesLegend({ roles }) {
+  const { t } = useTranslation();
   if (roles.length === 0) return null;
   return (
     <section className={ui.card} aria-labelledby="roles-title">
       <h2 id="roles-title" className={ui.sectionTitle}>
-        Vai trò và quyền
+        {t('users.rolesTitle')}
       </h2>
       <dl className={styles.roles}>
         {roles.map((r) => (
@@ -221,7 +231,7 @@ function RolesLegend({ roles }) {
               <ul className={ui.chips}>
                 {r.permissions.map((p) => (
                   <li key={p} className={ui.badgeMuted} title={p}>
-                    {PERMISSION_LABELS[p] ?? p}
+                    {permissionLabel(p, r.permission_names)}
                   </li>
                 ))}
               </ul>
@@ -234,6 +244,7 @@ function RolesLegend({ roles }) {
 }
 
 function CreateUserDialog({ open, roles, onClose, onCreated }) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('viewer');
@@ -251,7 +262,8 @@ function CreateUserDialog({ open, roles, onClose, onCreated }) {
       setPassword('');
       setError(null);
     }
-  }, [open, roles]);
+    // Only when the dialog opens: roles reloading on a language switch must not wipe the form.
+  }, [open]);
 
   const tooShort = withPassword && password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
   const canSubmit = !busy && email && role && (!withPassword || (password && !tooShort));
@@ -265,30 +277,30 @@ function CreateUserDialog({ open, roles, onClose, onCreated }) {
       if (withPassword) body.password = password;
       onCreated(await usersApi.create(body));
     } catch (err) {
-      setError(errorText(err));
+      setError(asError(err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal open={open} title="Tạo người dùng" busy={busy} onClose={onClose}>
+    <Modal open={open} title={t('users.createTitle')} busy={busy} onClose={onClose}>
       <form className={ui.form} onSubmit={onSubmit} noValidate>
         {error && (
           <div className={ui.error} role="alert">
-            {error}
+            {actionErrorMessage(error)}
           </div>
         )}
         <label className={ui.label}>
-          Email
-          <input className={ui.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ten@mq.com" />
+          {t('users.email')}
+          <input className={ui.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('login.emailPlaceholder')} />
         </label>
         <label className={ui.label}>
-          Tên hiển thị
+          {t('users.displayName')}
           <input className={ui.input} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label className={ui.label}>
-          Vai trò
+          {t('users.role')}
           <select className={ui.select} value={role} onChange={(e) => setRole(e.target.value)}>
             {roles.map((r) => (
               <option key={r.code} value={r.code}>
@@ -299,12 +311,12 @@ function CreateUserDialog({ open, roles, onClose, onCreated }) {
         </label>
         <label className={styles.checkbox}>
           <input type="checkbox" checked={withPassword} onChange={(e) => setWithPassword(e.target.checked)} />
-          Đặt mật khẩu (bỏ chọn nếu người dùng chỉ đăng nhập bằng Google)
+          {t('users.withPassword')}
         </label>
         {withPassword && (
           <PasswordField
-            label="Mật khẩu"
-            hint={`Tối thiểu ${MIN_PASSWORD_LENGTH} ký tự. Gửi riêng cho người dùng và nhắc họ đổi sau khi đăng nhập.`}
+            label={t('users.password')}
+            hint={t('users.passwordHint', { count: MIN_PASSWORD_LENGTH })}
             className={ui.label}
             inputClassName={ui.input}
             autoComplete="new-password"
@@ -314,10 +326,10 @@ function CreateUserDialog({ open, roles, onClose, onCreated }) {
         )}
         <div className={ui.actions}>
           <button type="button" className={ui.secondaryButton} onClick={onClose} disabled={busy}>
-            Huỷ
+            {t('common.cancel')}
           </button>
           <button type="submit" className={ui.primaryButton} disabled={!canSubmit}>
-            {busy ? 'Đang tạo…' : 'Tạo'}
+            {busy ? t('users.creating') : t('users.createSubmit')}
           </button>
         </div>
       </form>
@@ -326,6 +338,7 @@ function CreateUserDialog({ open, roles, onClose, onCreated }) {
 }
 
 function ResetPasswordDialog({ user, onClose, onDone }) {
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -345,24 +358,24 @@ function ResetPasswordDialog({ user, onClose, onDone }) {
       await usersApi.resetPassword(user.id, password);
       onDone(user);
     } catch (err) {
-      setError(errorText(err));
+      setError(asError(err));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal open={user !== null} title={`Đặt lại mật khẩu cho ${user?.email ?? ''}`} busy={busy} onClose={onClose}>
+    <Modal open={user !== null} title={t('users.resetTitle', { email: user?.email ?? '' })} busy={busy} onClose={onClose}>
       <form className={ui.form} onSubmit={onSubmit} noValidate>
         {error && (
           <div className={ui.error} role="alert">
-            {error}
+            {actionErrorMessage(error)}
           </div>
         )}
-        <p className={ui.muted}>Người dùng sẽ bị đăng xuất khỏi mọi thiết bị và phải dùng mật khẩu mới.</p>
+        <p className={ui.muted}>{t('users.resetText')}</p>
         <PasswordField
-          label="Mật khẩu mới"
-          hint={`Tối thiểu ${MIN_PASSWORD_LENGTH} ký tự.`}
+          label={t('users.newPassword')}
+          hint={t('password.minLength', { count: MIN_PASSWORD_LENGTH })}
           className={ui.label}
           inputClassName={ui.input}
           autoComplete="new-password"
@@ -371,10 +384,10 @@ function ResetPasswordDialog({ user, onClose, onDone }) {
         />
         <div className={ui.actions}>
           <button type="button" className={ui.secondaryButton} onClick={onClose} disabled={busy}>
-            Huỷ
+            {t('common.cancel')}
           </button>
           <button type="submit" className={ui.primaryButton} disabled={busy || !password || tooShort}>
-            {busy ? 'Đang lưu…' : 'Đặt lại'}
+            {busy ? t('common.saving') : t('users.resetSubmit')}
           </button>
         </div>
       </form>

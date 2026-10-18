@@ -23,7 +23,8 @@ test('password login -> profile -> logout', async ({ page, context }) => {
   const cookie = (await context.cookies()).find((c) => c.name === 'ecom_session');
   expect(cookie?.httpOnly).toBe(true);
   expect(cookie?.sameSite).toBe('Lax');
-  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+  // Only the UI language code may be stored in the browser.
+  expect(await page.evaluate(() => [Object.keys(localStorage), sessionStorage.length])).toEqual([['mq-admin-lang'], 0]);
 
   // Top-bar button (exact: the profile page also has "Đăng xuất tất cả thiết bị"), then confirm.
   await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click();

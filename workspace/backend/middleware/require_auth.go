@@ -4,6 +4,7 @@ import (
 	"context"
 	"main/component/api"
 	"main/component/models"
+	"main/i18n"
 	"net/http"
 	"net/url"
 	"strings"
@@ -31,6 +32,19 @@ func RequireAuth(auth Authenticator, cookieName string) gin.HandlerFunc {
 			return
 		}
 		c.Set(ContextUserKey, user)
+		// The account's saved language beats Accept-Language (see Locale).
+		i18n.Set(c, user.Locale)
+		c.Next()
+	}
+}
+
+// Locale picks the request's language from Accept-Language (i18n.Default when
+// nothing supported matches) for everything that runs after it, including
+// error_text in the response envelope. Mount it on the whole API; RequireAuth
+// later switches to the signed-in user's saved language.
+func Locale() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		i18n.Set(c, i18n.FromAcceptLanguage(c.GetHeader("Accept-Language")))
 		c.Next()
 	}
 }

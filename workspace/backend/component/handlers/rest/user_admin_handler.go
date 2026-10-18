@@ -43,7 +43,7 @@ func (h *UserAdminHandler) List(c *gin.Context) {
 		return
 	}
 	noStore(c)
-	api.Ok(c, models.UsersListResponse{Users: users})
+	api.Ok(c, models.UsersListResponse{Users: localizeManagedUsers(c, users)})
 }
 
 // Roles godoc
@@ -58,7 +58,7 @@ func (h *UserAdminHandler) Roles(c *gin.Context) {
 		respondAuthError(c, err)
 		return
 	}
-	api.Ok(c, models.RolesListResponse{Roles: roles})
+	api.Ok(c, models.RolesListResponse{Roles: localizeRoles(c, roles)})
 }
 
 // Create godoc
@@ -80,7 +80,7 @@ func (h *UserAdminHandler) Create(c *gin.Context) {
 		respondAuthError(c, err)
 		return
 	}
-	api.Ok(c, u)
+	api.Ok(c, localizeManagedUser(c, u))
 }
 
 // Update godoc
@@ -107,7 +107,7 @@ func (h *UserAdminHandler) Update(c *gin.Context) {
 		respondAuthError(c, err)
 		return
 	}
-	api.Ok(c, u)
+	api.Ok(c, localizeManagedUser(c, u))
 }
 
 // ResetPassword godoc

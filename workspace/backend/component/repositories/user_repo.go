@@ -19,13 +19,16 @@ var (
 )
 
 // appUserColumns lists app_user's columns explicitly (instead of SELECT *),
-// so adding a column to the table never breaks scanning into models.AppUser.
+// so adding a column to the table never breaks scanning into models.AppUser,
+// plus the user's settings from public.user_config (1-1; a user without a row
+// reads as the defaults, see migrations/006).
 func appUserColumns(alias string) string {
 	cols := []string{"id", "email", "display_name", "avatar_url", "password_hash", "google_sub", "status",
 		"failed_login_count", "locked_until", "last_login_at", "created_at", "updated_at", "role_id"}
 	for i, c := range cols {
 		cols[i] = alias + "." + c
 	}
+	cols = append(cols, `COALESCE((SELECT uc.locale FROM public.user_config uc WHERE uc.user_id = `+alias+`.id), 'vi') AS locale`)
 	return strings.Join(cols, ", ")
 }
 
@@ -79,12 +82,18 @@ func (r *UserRepo) Create(ctx context.Context, u models.AppUser, roleCode string
 		u.Status = models.UserStatusActive
 	}
 	strSql := `
-		INSERT INTO public.app_user (email, display_name, avatar_url, password_hash, google_sub, status, role_id)
-		SELECT $1, $2, $3, $4, $5, $6, r.id FROM public.role r WHERE r.code = $7
-		RETURNING id
+		WITH new_user AS (
+		    INSERT INTO public.app_user (email, display_name, avatar_url, password_hash, google_sub, status, role_id)
+		    SELECT $1, $2, $3, $4, $5, $6, r.id FROM public.role r WHERE r.code = $7
+		    RETURNING id
+		), new_config AS (
+		    INSERT INTO public.user_config (user_id, locale)
+		    SELECT id, COALESCE(NULLIF($8, ''), 'vi') FROM new_user
+		)
+		SELECT id FROM new_user
 	`
 	var id int64
-	err := r.db.QueryRowContext(ctx, strSql, u.Email, u.DisplayName, u.AvatarURL, u.PasswordHash, u.GoogleSub, u.Status, roleCode).Scan(&id)
+	err := r.db.QueryRowContext(ctx, strSql, u.Email, u.DisplayName, u.AvatarURL, u.PasswordHash, u.GoogleSub, u.Status, roleCode, u.Locale).Scan(&id)
 	var pqErr *pq.Error
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -155,6 +164,18 @@ func (r *UserRepo) MarkLoginSuccess(ctx context.Context, userID int64) (time.Tim
 	var at time.Time
 	err := r.db.QueryRowContext(ctx, strSql, userID).Scan(&at)
 	return at, err
+}
+
+// SetLocale stores the user's preferred UI language in public.user_config,
+// creating the row if the user has none yet. The value is already validated
+// against i18n.Supported; ck_user_config_locale is the DB-side guard.
+func (r *UserRepo) SetLocale(ctx context.Context, userID int64, locale string) error {
+	strSql := `
+		INSERT INTO public.user_config (user_id, locale) VALUES ($1, $2)
+		ON CONFLICT (user_id) DO UPDATE SET locale = EXCLUDED.locale, updated_at = NOW()
+	`
+	_, err := r.db.ExecContext(ctx, strSql, userID, locale)
+	return err
 }
 
 // SetPassword stores a new bcrypt hash and clears any lockout.

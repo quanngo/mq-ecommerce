@@ -35,6 +35,8 @@ type fakeAuthSvc struct {
 	sessionUser  *models.SessionUser // returned by Authenticate; nil = testUser
 	changeErr    error
 	gotChange    [2]string // current, new
+	gotLocale    string
+	setLocaleErr error
 }
 
 var testUser = models.SessionUser{
@@ -90,6 +92,13 @@ func (f *fakeAuthSvc) CleanupAuthSessions() {}
 func (f *fakeAuthSvc) ChangePassword(_ context.Context, _ *models.SessionUser, current, next string) error {
 	f.gotChange = [2]string{current, next}
 	return f.changeErr
+}
+func (f *fakeAuthSvc) SetLocale(_ context.Context, _ *models.SessionUser, locale string) error {
+	f.gotLocale = locale
+	if locale != "vi" && locale != "en" {
+		return services.ErrInvalidRequest
+	}
+	return f.setLocaleErr
 }
 func (f *fakeAuthSvc) HashNewPassword(pw string) (string, error)  { return "hash:" + pw, nil }
 func (f *fakeAuthSvc) WarnIfDefaultAdminPassword(context.Context) {}

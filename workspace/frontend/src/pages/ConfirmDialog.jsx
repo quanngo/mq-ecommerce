@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import styles from './ConfirmDialog.module.css';
 
 /**
  * Modal confirmation. Escape or clicking the backdrop cancels; focus starts on
  * Cancel so an accidental Enter doesn't confirm a destructive action.
  */
-export function ConfirmDialog({ open, title, message, confirmLabel, cancelLabel = 'Huỷ', busy = false, danger = false, onConfirm, onCancel }) {
+export function ConfirmDialog({ open, title, message, confirmLabel, cancelLabel, busy = false, danger = false, onConfirm, onCancel }) {
+  const { t } = useTranslation();
   const titleId = useId();
   const messageId = useId();
   const cancelRef = useRef(null);
@@ -37,7 +39,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel, cancelLabel 
         </p>
         <div className={styles.actions}>
           <button ref={cancelRef} type="button" className={styles.cancel} onClick={onCancel} disabled={busy}>
-            {cancelLabel}
+            {cancelLabel ?? t('common.cancel')}
           </button>
           <button type="button" className={danger ? styles.danger : styles.confirm} onClick={onConfirm} disabled={busy}>
             {confirmLabel}

@@ -12,6 +12,7 @@ import (
 	"io"
 	"main/component/models"
 	"main/component/repositories"
+	"main/i18n"
 	"main/utils"
 	"net/mail"
 	"strings"
@@ -40,6 +41,9 @@ type AuthService interface {
 	// ChangePassword changes the signed-in user's own password and signs out
 	// their other sessions (this one stays).
 	ChangePassword(ctx context.Context, user *models.SessionUser, currentPassword, newPassword string) error
+	// SetLocale saves the signed-in user's preferred UI language (EC-7);
+	// ErrInvalidRequest unless it is one of i18n.Supported.
+	SetLocale(ctx context.Context, user *models.SessionUser, locale string) error
 
 	CreateUser(ctx context.Context, in CreateUserInput) (int64, error)
 	CleanupAuthSessions()
@@ -70,6 +74,7 @@ type CreateUserInput struct {
 	DisplayName string
 	Password    *string // nil = Google-only account
 	Role        string  // role code; "" = auth.default-role
+	Locale      string  // UI language; "" = i18n.Default
 }
 
 type userStore interface {
@@ -81,6 +86,7 @@ type userStore interface {
 	RecordLoginFailure(ctx context.Context, userID int64, maxFailed int, lockFor time.Duration) (int, *time.Time, error)
 	MarkLoginSuccess(ctx context.Context, userID int64) (time.Time, error)
 	SetPassword(ctx context.Context, userID int64, hash string) error
+	SetLocale(ctx context.Context, userID int64, locale string) error
 }
 
 type sessionStore interface {
@@ -419,7 +425,10 @@ func (s *AuthServiceImpl) CreateUser(ctx context.Context, in CreateUserInput) (i
 	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email {
 		return 0, fmt.Errorf("invalid email %q", in.Email)
 	}
-	u := models.AppUser{Email: email, DisplayName: strings.TrimSpace(in.DisplayName), Status: models.UserStatusActive}
+	if in.Locale != "" && !i18n.IsSupported(in.Locale) {
+		return 0, fmt.Errorf("unsupported locale %q (supported: %s)", in.Locale, strings.Join(i18n.Supported, ", "))
+	}
+	u := models.AppUser{Email: email, DisplayName: strings.TrimSpace(in.DisplayName), Status: models.UserStatusActive, Locale: in.Locale}
 	if in.Password != nil {
 		hash, err := s.HashNewPassword(*in.Password)
 		if err != nil {
@@ -452,6 +461,19 @@ func (s *AuthServiceImpl) HashNewPassword(pw string) (string, error) {
 		return "", wrapAuth(ErrInternal, err)
 	}
 	return string(hash), nil
+}
+
+func (s *AuthServiceImpl) SetLocale(ctx context.Context, actor *models.SessionUser, locale string) error {
+	if actor == nil {
+		return ErrUnauthenticated
+	}
+	if !i18n.IsSupported(locale) {
+		return ErrInvalidRequest
+	}
+	if err := s.users.SetLocale(ctx, actor.ID, locale); err != nil {
+		return wrapAuth(ErrInternal, err)
+	}
+	return nil
 }
 
 func (s *AuthServiceImpl) ChangePassword(ctx context.Context, actor *models.SessionUser, currentPassword, newPassword string) error {

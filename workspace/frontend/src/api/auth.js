@@ -11,6 +11,8 @@ import { apiRequest } from './client';
  * @property {string | null} last_login_at  RFC3339
  * @property {{ code: string, name: string }} role
  * @property {string[]} permissions  e.g. "users.manage"; check these, not the role name
+ * @property {Record<string, string>} [permission_names]  permission code -> name in the user's language
+ * @property {'vi' | 'en'} [locale]  the user's saved UI language
  */
 
 /**
@@ -37,6 +39,17 @@ export const authApi = {
   login: async (email, password, rememberMe = false) => {
     const user = await apiRequest('POST', '/auth/login', { email, password, remember_me: rememberMe });
     if (!user) throw new Error('empty /auth/login response');
+    return user;
+  },
+
+  /**
+   * Saves the signed-in user's UI language.
+   * @param {'vi' | 'en'} locale
+   * @returns {Promise<User>} the user, with role/permission names in the new language
+   */
+  setLocale: async (locale) => {
+    const user = await apiRequest('PUT', '/auth/me/locale', { locale });
+    if (!user) throw new Error('empty /auth/me/locale response');
     return user;
   },
 
