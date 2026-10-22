@@ -23,3 +23,12 @@ export function formatNumber(n) {
 export function formatMoney(amount) {
   return new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(amount) || 0);
 }
+
+/** File size for people: "850 KB", "1,2 MB" / "1.2 MB". @param {number} bytes */
+export function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  const nf = (v, digits) => new Intl.NumberFormat(currentIntlLocale(), { maximumFractionDigits: digits }).format(v);
+  if (n < 1024) return `${nf(n, 0)} B`;
+  if (n < 1024 * 1024) return `${nf(n / 1024, 0)} KB`;
+  return `${nf(n / (1024 * 1024), 1)} MB`;
+}

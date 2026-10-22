@@ -26,9 +26,10 @@ src/
   main.jsx               BrowserRouter (ROUTER_FUTURE flags) > AuthProvider > App
   App.jsx                all routes; protected pages go inside <Route element={<ProtectedRoute />}>
   routerFuture.js        React Router v7 future flags; pass to every Router (tests too)
-  api/client.js          apiRequest(method, path, body): the only place that calls fetch
+  api/client.js          apiRequest(method, path, body) / apiUpload(path, FormData): the only place that calls fetch
   api/auth.js            authApi + googleLoginUrl + safeNextPath; one module per backend area
   api/users.js, api/orders.js   user management; orders list/detail (query built from ORDER_QUERY_KEYS)
+  api/productImages.js   product images (EC-10): shops, list, multipart upload; MAX_IMAGE_BYTES / imageFileProblem
   auth/AuthContext.jsx   useAuth() -> { state: {status, user}, login, logout, logoutAll, can, setLanguage }
   auth/ProtectedRoute.jsx
   auth/errorMessages.js  backend error code -> message in the current language; permissionLabel
@@ -37,7 +38,8 @@ src/
   locales/vi.json, en.json   all UI text, same keys in both (a test checks)
   pages/*.jsx + *.module.css   one page = one component + its CSS module
   pages/orderFormat.js   order labels (marketplace, LeadStatus, SaleOrderStatus, payment), translated
-  pages/LanguageSwitcher.jsx   VI / EN toggle (header and login page)
+  pages/AppLayout.jsx    shell of signed-in pages: main menu in a left sidebar (bar above the page under 768px)
+  pages/LanguageSwitcher.jsx   VI / EN toggle (sidebar and login page)
   styles/global.css      design tokens (:root vars, dark mode) and resets only
   test/server.js         MSW fake of the Go backend + mutable `backend` state
   test/setup.js          jest-dom, MSW lifecycle, relative-fetch shim, storage spy
@@ -48,7 +50,7 @@ e2e/*.spec.js            Playwright
 ## Conventions
 
 - **API calls**: add a function to `src/api/<area>.js` that calls
-  `apiRequest('GET'|'POST', '/path', body)`. Paths are relative to `/api/v1`.
+  `apiRequest('GET'|'POST', '/path', body)` (or `apiUpload('/path', formData)` for files). Paths are relative to `/api/v1`.
   The backend always answers HTTP 200 with `{code, message, data[]}`.
   `apiRequest` returns `data[0]` and throws `ApiError(code, errorCode)`
   otherwise. `UNAUTHENTICATED` automatically logs the user out of the UI. Don't
@@ -89,5 +91,8 @@ e2e/*.spec.js            Playwright
   `div`, so it never collides with `findByRole('status')`).
 - Permissions in tests: `backend.role = 'viewer'` picks a seeded role;
   `backend.withoutPermissions = ['orders.detail']` takes permissions away from it.
+- Uploads in tests: `test/setup.js` encodes jsdom's `FormData` as real multipart (Node's fetch can't), and
+  `test/server.js` reads it with `readMultipart` (`request.formData()` fails under jsdom). Use
+  `userEvent.setup({ applyAccept: false })` to pick files the `accept` attribute would hide.
 - E2E specs in `e2e/` run against the real backend, and skip themselves when their
   env vars are missing.

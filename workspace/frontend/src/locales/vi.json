@@ -20,7 +20,8 @@
     "logout": "Đăng xuất",
     "logoutTitle": "Đăng xuất?",
     "logoutMessage": "Bạn sẽ đăng xuất khỏi trình duyệt này (mọi tab đang mở).",
-    "loggingOut": "Đang đăng xuất…"
+    "loggingOut": "Đang đăng xuất…",
+    "productImages": "Ảnh sản phẩm"
   },
   "login": {
     "title": "Đăng nhập",
@@ -247,6 +248,59 @@
       "NOT_FOUND": "Không tìm thấy đơn hàng.",
       "INVALID_REQUEST": "Bộ lọc không hợp lệ. Kiểm tra lại ngày (từ ngày phải trước đến ngày) và từ khoá.",
       "FORBIDDEN": "Bạn không có quyền xem nội dung này."
+    },
+    "image": {
+      "INVALID_IMAGE": "Ảnh không hợp lệ: chỉ nhận JPG hoặc PNG, tối đa 5 MB.",
+      "MARKETPLACE_ERROR": "Sàn từ chối ảnh hoặc không phản hồi. Vui lòng thử lại.",
+      "NOT_FOUND": "Shop không tồn tại hoặc đã bị tắt.",
+      "INVALID_REQUEST": "Thông tin tải lên không hợp lệ. Chọn lại sàn, shop và loại ảnh."
     }
+  },
+  "productImages": {
+    "title": "Ảnh sản phẩm",
+    "intro": "Ảnh được tải thẳng lên sàn cho shop bạn chọn. Hệ thống chỉ lưu đường dẫn sàn trả về để dùng khi đăng sản phẩm.",
+    "uploadTitle": "Tải ảnh lên sàn",
+    "marketPlace": "Sàn",
+    "shop": "Shop",
+    "useCase": "Loại ảnh (TikTok)",
+    "files": "Ảnh",
+    "filesHint": "JPG hoặc PNG, tối đa 5 MB mỗi ảnh. Có thể chọn nhiều ảnh.",
+    "noShops": "Chưa có shop TikTok Shop hoặc Lazada nào được kết nối.",
+    "chooseShop": "Chọn shop",
+    "upload": "Tải lên",
+    "uploading": "Đang tải lên {{done}}/{{total}}…",
+    "clear": "Bỏ chọn",
+    "remove": "Bỏ {{name}}",
+    "status": {
+      "waiting": "Chờ tải",
+      "uploading": "Đang tải…",
+      "done": "Đã tải lên",
+      "error": "Lỗi"
+    },
+    "problem": {
+      "type": "Chỉ nhận JPG hoặc PNG.",
+      "size": "Ảnh phải nhỏ hơn 5 MB."
+    },
+    "uploadedCount_other": "Đã tải lên {{count}} ảnh.",
+    "listTitle": "Ảnh đã tải lên",
+    "filter": "Lọc",
+    "loading": "Đang tải danh sách ảnh…",
+    "empty": "Chưa có ảnh nào.",
+    "count_other": "{{total}} ảnh",
+    "copyUrl": "Sao chép URL",
+    "copyUri": "Sao chép URI",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được",
+    "open": "Mở ảnh {{name}}",
+    "dims": "{{width}}×{{height}} px",
+    "by": "bởi {{email}}",
+    "useCases": {
+      "MAIN_IMAGE": "Ảnh chính",
+      "ATTRIBUTE_IMAGE": "Ảnh thuộc tính",
+      "DESCRIPTION_IMAGE": "Ảnh mô tả",
+      "CERTIFICATION_IMAGE": "Ảnh chứng nhận",
+      "SIZE_CHART_IMAGE": "Bảng size"
+    },
+    "loadShopsFailed": "Không tải được danh sách shop."
   }
 }

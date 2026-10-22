@@ -30,7 +30,7 @@ var allTables = []string{
 	"public.log_order_status", "public.ecom_statement_transaction",
 	"public.ecom_order_item", "public.ecom_order",
 	"public.od_ecom_order", "public.od_do_new", "public.od_sale_order",
-	"public.user_session", "public.oauth_login_attempt", "public.user_config", "public.app_user",
+	"public.ecom_product_image", "public.user_session", "public.oauth_login_attempt", "public.user_config", "public.app_user",
 }
 
 func testDB(t *testing.T) *sqlx.DB {
@@ -614,5 +614,50 @@ func TestUserLocale(t *testing.T) {
 	mustExec(t, db, `DELETE FROM public.app_user WHERE id = $1`, defID)
 	if err := db.Get(&rows, `SELECT COUNT(*) FROM public.user_config WHERE user_id = $1`, defID); err != nil || rows != 0 {
 		t.Errorf("user_config rows after user delete = %d, %v", rows, err)
+	}
+}
+
+func TestProductImageRepo(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	images, users := NewProductImageRepo(db), NewUserRepo(db)
+
+	uploader, err := users.Create(ctx, models.AppUser{Email: "op@mq.com"}, "operator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := images.Insert(ctx, models.ProductImage{MarketPlace: "Tiktok", ShopID: "tt-1", UseCase: "MAIN_IMAGE", URI: "tos/a",
+		URL: "https://cdn/a.jpg", Width: 800, Height: 600, FileName: "a.jpg", SizeBytes: 1234, UploadedBy: &uploader})
+	if err != nil {
+		t.Fatalf("Insert: %v (is migration 007 applied?)", err)
+	}
+	if saved.ID == 0 || saved.UploadedByEmail == nil || *saved.UploadedByEmail != "op@mq.com" || saved.URI != "tos/a" || saved.CreatedAt.IsZero() {
+		t.Errorf("saved = %+v", saved)
+	}
+	for _, shop := range []string{"lz-1", "lz-1", "lz-2"} {
+		if _, err := images.Insert(ctx, models.ProductImage{MarketPlace: "Lazada", ShopID: shop, URL: "https://cdn/" + shop}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := images.Insert(ctx, models.ProductImage{MarketPlace: "Shopee", ShopID: "s", URL: "u"}); err == nil {
+		t.Error("Shopee accepted; ck_ecom_product_image_market_place missing?")
+	}
+
+	all, total, err := images.List(ctx, models.ProductImageFilter{Limit: 10})
+	if err != nil || total != 4 || len(all) != 4 || all[0].ID < all[3].ID {
+		t.Fatalf("List all = %d/%d %v (want newest first)", len(all), total, err)
+	}
+	lz, total, _ := images.List(ctx, models.ProductImageFilter{MarketPlace: "Lazada", ShopID: "lz-1", Limit: 1, Offset: 1})
+	if total != 2 || len(lz) != 1 || lz[0].ShopID != "lz-1" || lz[0].UploadedByEmail != nil {
+		t.Errorf("List lz-1 page 2 = %+v total %d", lz, total)
+	}
+	if img, err := images.Get(ctx, 99999); img != nil || err != nil {
+		t.Errorf("Get(missing) = %+v, %v", img, err)
+	}
+
+	// Deleting the uploader keeps the image, without an uploader.
+	mustExec(t, db, `DELETE FROM public.app_user WHERE id = $1`, uploader)
+	if img, _ := images.Get(ctx, saved.ID); img == nil || img.UploadedBy != nil {
+		t.Errorf("after uploader delete = %+v", img)
 	}
 }

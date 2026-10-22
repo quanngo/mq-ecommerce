@@ -21,7 +21,7 @@ the EC-1 acceptance criteria, and most are enforced by a test.
 | Middleware | `middleware/require_auth.go`: `RequireAuth` (also sets the user's locale), `RequirePermission`, `CurrentUser`, `RequireSameOrigin`, `Locale` |
 | Wiring | `server/base.go` `Initialize()` (`newAuthService`, `newGoogleClient`), `InitializeWorkers()`; `server/create_user.go`; `main.go` |
 | Cleanup job | `cleanupAuthSessions` in `server/workers.go` + `config/workers.yml` |
-| Frontend | `workspace/frontend/src/`: `api/client.js`, `api/auth.js`, `api/users.js`, `auth/AuthContext.jsx` (`login`/`logout`/`logoutAll`/`can`/`setLanguage`), `auth/authChannel.js` (cross-tab sync), `auth/ProtectedRoute.jsx` (`permission` prop), `auth/errorMessages.js` (`authErrorMessage`/`actionErrorMessage`/`orderErrorMessage`/`permissionLabel`), `i18n/` + `locales/{vi,en}.json` (EC-7), `pages/LanguageSwitcher.jsx`, `pages/AppLayout.jsx` (top bar, menu, logout), `pages/LoginPage.jsx`, `pages/ProfilePage.jsx`, `pages/ChangePasswordPage.jsx`, `pages/UsersPage.jsx`, `pages/ConfirmDialog.jsx`, `pages/Modal.jsx` |
+| Frontend | `workspace/frontend/src/`: `api/client.js`, `api/auth.js`, `api/users.js`, `auth/AuthContext.jsx` (`login`/`logout`/`logoutAll`/`can`/`setLanguage`), `auth/authChannel.js` (cross-tab sync), `auth/ProtectedRoute.jsx` (`permission` prop), `auth/errorMessages.js` (`authErrorMessage`/`actionErrorMessage`/`orderErrorMessage`/`permissionLabel`), `i18n/` + `locales/{vi,en}.json` (EC-7), `pages/LanguageSwitcher.jsx`, `pages/AppLayout.jsx` (left sidebar: menu, language, user, logout; a bar above the page under 768px), `pages/LoginPage.jsx`, `pages/ProfilePage.jsx`, `pages/ChangePasswordPage.jsx`, `pages/UsersPage.jsx`, `pages/ConfirmDialog.jsx`, `pages/Modal.jsx` |
 | Permission-guarded feature (reference) | Orders menu (EC-4): `component/handlers/rest/order_handler.go` (per-route `RequirePermission`), `component/services/order_service.go`, `component/repositories/order_query_repo.go`; FE `api/orders.js`, `pages/OrdersPage.jsx`, `pages/OrderDetailPage.jsx`, routes in `App.jsx`, menu item in `AppLayout.jsx`. API: `workspace/backend/API_DOCUMENT.md` |
 | Design | `.workflow/EC-1/design.md` (if present locally; `.workflow/` is gitignored) |
 
@@ -61,7 +61,7 @@ User management, all needing a session:
   | `users.manage` | `PermUsersManage` | `POST /users`, `PATCH /users/:id`, `POST /users/:id/reset-password`; FE create/role/lock/reset controls |
   | `orders.read` | `PermOrdersRead` | `GET /orders` (list); FE menu "Đơn hàng", `/orders` |
   | `orders.detail` | `PermOrdersDetail` | `GET /orders/:id` (detail, with phone/address/items); FE `/orders/:id` and the order-id link in the list |
-  | `orders.write` | `PermOrdersWrite` | nothing yet (reserved for order updates) |
+  | `orders.write` | `PermOrdersWrite` | `/product-images` (EC-10: upload product images to TikTok/Lazada, list them); FE menu "Ảnh sản phẩm", `/product-images` |
 - **Seeded** by `004` + `005`, all `is_system`:
   | Role | Permissions |
   |---|---|

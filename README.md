@@ -34,12 +34,7 @@ Edit `projects.env`. Each project needs 4 lines under its type
 (`FRONTEND_*` / `BACKEND_*`), numbered starting at 1, plus a `_COUNT`:
 
 ```bash
-FRONTEND_COUNT=2
-
-FRONTEND_KEY_1=web
-FRONTEND_NAME_1="Marketing Web App"
-FRONTEND_REPO_1=git@github.com:org/web.git
-FRONTEND_START_1="npm run dev"
+FRONTEND_COUNT=1
 
 FRONTEND_KEY_2=admin
 FRONTEND_NAME_2="Admin Dashboard"

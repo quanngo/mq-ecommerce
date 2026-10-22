@@ -82,6 +82,19 @@ Ask the developer about anything not given:
    the body. Responses go through `api.Ok` / `api.ErrorWithMessage`, which
    always return HTTP 200 with the status in the body.
 
+### Product images (EC-10)
+
+TikTok and Lazada already have product-image upload
+(`middleware/product_image.go`: `TiktokUploadImage`, `LazadaUploadImage`;
+`services/product_image_service.go`; `POST /api/v1/product-images`). It is the
+template for any multipart call: build the body with `multipartBody`, sign
+without the file (TikTok's signer skips multipart bodies; Lazada signs only the
+query params), use `uploadHTTPClient` (60 s timeout), and return a
+`*MarketplaceError` that the service wraps as `MARKETPLACE_ERROR`. To add a
+platform: an `UploadImage` client method, a case in `ProductImageServiceImpl.Upload`,
+the value in `imageMarketPlaces`, and widen `ck_ecom_product_image_market_place`
+in a new migration. Shopee first needs its shop-level signing fixed (see above).
+
 ## 3. Data the developer must add (it can't come from code)
 
 - **`public.market_token`**: one row per shop (`market_place`, `shop_id`,

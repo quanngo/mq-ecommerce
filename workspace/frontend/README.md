@@ -7,15 +7,18 @@ React 18 + Vite, plain JavaScript (JSX), React Router 6, CSS modules. Pages:
 - user management (`/users`), which needs `users.read`, plus `users.manage` to change anything;
 - orders (`/orders`, needs `orders.read`): search by order id / tracking code / customer / phone, filter by
   marketplace, status and creation date, 20 per page; filters live in the URL;
-- order detail (`/orders/:id`, needs `orders.detail`): order info, customer and address, items, totals.
+- order detail (`/orders/:id`, needs `orders.detail`): order info, customer and address, items, totals;
+- product images (`/product-images`, needs `orders.write`, EC-10): pick a TikTok Shop or Lazada shop,
+  upload JPG/PNG images (≤ 5 MB) straight to it, then copy the URL (and TikTok URI) the marketplace
+  returned. Only that URL is kept, not the file.
 
-Tickets EC-1 (login, users), EC-4 (orders), EC-7 (Vietnamese / English). The backend is
+Tickets EC-1 (login, users), EC-4 (orders), EC-7 (Vietnamese / English), EC-10 (product images). The backend is
 `workspace/backend`; its API is in `workspace/backend/API_DOCUMENT.md`.
 
 ## Languages (EC-7)
 
 The UI is in **Vietnamese** (default) and **English**, switched with the VI / EN toggle in the
-top bar or on the login page.
+sidebar or on the login page.
 
 - Signed in, the choice is saved on the account (`PUT /api/v1/auth/me/locale`), so it follows the
   user to other browsers; other open tabs switch too. Signed out, it is remembered in this
@@ -40,7 +43,8 @@ npm run dev          # http://localhost:8088, proxies /api -> http://localhost:9
 To preview the UI with no backend or database:
 
 ```bash
-npm run dev:mock     # in-memory fake of /api/v1/auth, /users, /roles, /orders (mock/dev-backend.js, 57 demo orders) + Vite on :8088
+npm run dev:mock     # in-memory fake of /api/v1/auth, /users, /roles, /orders, /product-images (mock/dev-backend.js, 57 demo orders) + Vite on :8088
+                     # product images: 3 fake shops; a file named "...fail..." gets MARKETPLACE_ERROR
                      # admin: admin@mq.com / 123456 · operator: demo@mq.com / demo-password
                      # Google button opens a mock consent page (allowed, not-allowed, gmail, cancel)
 ```

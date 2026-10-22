@@ -20,7 +20,8 @@
     "logout": "Sign out",
     "logoutTitle": "Sign out?",
     "logoutMessage": "You will be signed out of this browser (all open tabs).",
-    "loggingOut": "Signing out…"
+    "loggingOut": "Signing out…",
+    "productImages": "Product images"
   },
   "login": {
     "title": "Sign in",
@@ -248,6 +249,61 @@
       "NOT_FOUND": "Order not found.",
       "INVALID_REQUEST": "Invalid filters. Check the dates (From must be before To) and the search text.",
       "FORBIDDEN": "You don't have permission to view this."
+    },
+    "image": {
+      "INVALID_IMAGE": "Invalid image: only JPG or PNG up to 5 MB.",
+      "MARKETPLACE_ERROR": "The marketplace refused the image or did not respond. Please try again.",
+      "NOT_FOUND": "The shop doesn't exist or is disabled.",
+      "INVALID_REQUEST": "Invalid upload. Choose the marketplace, shop and image type again."
     }
+  },
+  "productImages": {
+    "title": "Product images",
+    "intro": "Images are uploaded straight to the marketplace for the shop you choose. Only the URL the marketplace returns is kept, for use when listing products.",
+    "uploadTitle": "Upload to a marketplace",
+    "marketPlace": "Marketplace",
+    "shop": "Shop",
+    "useCase": "Image type (TikTok)",
+    "files": "Images",
+    "filesHint": "JPG or PNG, up to 5 MB each. You can pick several.",
+    "noShops": "No TikTok Shop or Lazada shop is connected yet.",
+    "chooseShop": "Choose a shop",
+    "upload": "Upload",
+    "uploading": "Uploading {{done}}/{{total}}…",
+    "clear": "Clear",
+    "remove": "Remove {{name}}",
+    "status": {
+      "waiting": "Waiting",
+      "uploading": "Uploading…",
+      "done": "Uploaded",
+      "error": "Failed"
+    },
+    "problem": {
+      "type": "Only JPG or PNG.",
+      "size": "Must be smaller than 5 MB."
+    },
+    "uploadedCount_one": "Uploaded {{count}} image.",
+    "uploadedCount_other": "Uploaded {{count}} images.",
+    "listTitle": "Uploaded images",
+    "filter": "Filter",
+    "loading": "Loading images…",
+    "empty": "No images yet.",
+    "count_one": "{{total}} image",
+    "count_other": "{{total}} images",
+    "copyUrl": "Copy URL",
+    "copyUri": "Copy URI",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy",
+    "open": "Open image {{name}}",
+    "dims": "{{width}}×{{height}} px",
+    "by": "by {{email}}",
+    "useCases": {
+      "MAIN_IMAGE": "Main image",
+      "ATTRIBUTE_IMAGE": "Attribute image",
+      "DESCRIPTION_IMAGE": "Description image",
+      "CERTIFICATION_IMAGE": "Certification",
+      "SIZE_CHART_IMAGE": "Size chart"
+    },
+    "loadShopsFailed": "Couldn't load the shops."
   }
 }

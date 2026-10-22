@@ -5,6 +5,7 @@ import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
 import { OrdersPage } from './pages/OrdersPage';
+import { ProductImagesPage } from './pages/ProductImagesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { UsersPage } from './pages/UsersPage';
 
@@ -21,6 +22,9 @@ export function App() {
           </Route>
           <Route element={<ProtectedRoute permission="orders.detail" />}>
             <Route path="/orders/:id" element={<OrderDetailPage />} />
+          </Route>
+          <Route element={<ProtectedRoute permission="orders.write" />}>
+            <Route path="/product-images" element={<ProductImagesPage />} />
           </Route>
           <Route element={<ProtectedRoute permission="users.read" />}>
             <Route path="/users" element={<UsersPage />} />

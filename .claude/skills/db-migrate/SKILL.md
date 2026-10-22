@@ -57,6 +57,10 @@ re-running anything, so always preview it, confirm it, then execute.
   `app_user` (`user_id` is PK and FK, `ON DELETE CASCADE`), starting with
   `locale` (`vi`|`en`, EC-7), and backfills a row for every existing user. Code
   reads a missing row as `vi`.
+- `007_ecom_product_image.sql` creates `public.ecom_product_image`: product
+  images uploaded to TikTok/Lazada (EC-10). Only what the marketplace returns is
+  kept (`url`, TikTok `uri` and `use_case`, size), plus `uploaded_by`
+  (`app_user`, `ON DELETE SET NULL`). `market_place` is limited to `Tiktok`/`Lazada`.
 - `dev/connector_tables.sql` holds minimal stand-ins for the Connector's
   `public.od_ecom_order`, `od_do_new` and `od_sale_order`. It is **local
   only**: `migrate.sh` never applies subdirectories. Load it with `psql -f`
@@ -88,7 +92,7 @@ change, also extend the matching test.
 ## Writing a new migration
 
 - **Name:** `NNN_short_description.sql` in `workspace/backend/migrations/`,
-  with NNN one higher than the current highest (`006_user_config.sql`
+  with NNN one higher than the current highest (`007_ecom_product_image.sql`
   today). Files apply in filename order. Only letters, digits, `_ . -` are
   accepted.
 - **Never edit a file that has been applied.** Its name is already recorded,

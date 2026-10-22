@@ -21,6 +21,8 @@
   "error.INVALID_ROLE": "Invalid role.",
   "error.LAST_ADMIN": "Not allowed: this is the last administrator who can manage users.",
   "error.CANNOT_MODIFY_SELF": "You can't change your own role, status or password here.",
+  "error.INVALID_IMAGE": "Invalid image: only JPG or PNG up to 5 MB.",
+  "error.MARKETPLACE_ERROR": "The marketplace refused the request or did not respond. Please try again later.",
 
   "status.200": "Success",
   "status.400": "Bad request",

@@ -20,7 +20,7 @@ function parse(err) {
 }
 
 /**
- * @param {('login' | 'action' | 'order')[]} contexts  most specific first
+ * @param {('login' | 'action' | 'order' | 'image')[]} contexts  most specific first
  * @param {unknown} err
  */
 function describe(contexts, err) {
@@ -61,6 +61,15 @@ export function actionErrorMessage(err) {
  */
 export function orderErrorMessage(err) {
   return describe(['order', 'action'], err);
+}
+
+/**
+ * Message for an error from the Product images page.
+ * @param {unknown} err  ApiError, error code or null
+ * @returns {string}
+ */
+export function imageErrorMessage(err) {
+  return describe(['image', 'action'], err);
 }
 
 /**

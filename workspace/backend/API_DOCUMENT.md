@@ -10,6 +10,7 @@ Go 1.24 + Gin. Routes are registered in `component/handlers/rest/rest.go` (`APIR
 - [Auth](#auth) — `/auth/*`
 - [Users and roles](#users-and-roles) — `/users`, `/roles`
 - [Orders](#orders) — `/orders`
+- [Product images](#product-images) — `/product-images`
 - [Marketplaces](#marketplaces) — `/tiktok`, `/lazada`
 - [Other](#other) — swagger
 
@@ -148,6 +149,30 @@ Read-only views of `public.ecom_order` / `ecom_order_item` for the admin app's O
 - **Request**: path `id` (the `ecom_order.id` from the list, not the marketplace `order_id`)
 - **Response**: 200, `data[0]` = `{order: OrderDetail}`; `OrderDetail` = every `OrderSummary` field plus `{address, province, district, sub_district, neighborhood, warehouse, shipping_label, comment, discount, shipping_fee, items: [{id, name, sku, quantity, price}]}` (`items` is `[]` when there are none). Response has `Cache-Control: no-store`.
 - **Errors**: `404 NOT_FOUND` (unknown or non-numeric id), `401 UNAUTHENTICATED`, `403 FORBIDDEN`
+
+## Product images
+
+Product images uploaded from the admin app straight to TikTok Shop or Lazada (EC-10). The file is **not** stored by this service: it is sent to the marketplace and only what the marketplace returns is kept in `public.ecom_product_image` (migration `007`), for later product listings. Mounted only when `ProductImageService` is wired (`server/base.go`). Every route needs a session and permission `orders.write`.
+
+### GET /product-images/shops
+- **Description**: Shops images can be uploaded to: `market_token` rows of TikTok and Lazada that are enabled and have an access token. Also lists TikTok's image use cases.
+- **Auth**: session, permission `orders.write`
+- **Response**: 200, `data[0]` = `{shops: [{market_place: "Tiktok"|"Lazada", shop_id}], tiktok_use_cases: ["MAIN_IMAGE", "ATTRIBUTE_IMAGE", "DESCRIPTION_IMAGE", "CERTIFICATION_IMAGE", "SIZE_CHART_IMAGE"]}`
+- **Errors**: `401 UNAUTHENTICATED`, `403 FORBIDDEN`
+
+### GET /product-images
+- **Description**: Uploaded images, newest first (`created_at DESC, id DESC`).
+- **Auth**: session, permission `orders.write`
+- **Request**: query (all optional) `market_place` (`Tiktok` | `Lazada`), `shop_id` (≤128), `page` (≥1, default 1), `page_size` (1–100, default 24)
+- **Response**: 200, `data[0]` = `{images: ProductImage[], total, page, page_size}`; `ProductImage` = `{id, market_place, shop_id, use_case (TikTok, '' for Lazada), uri (TikTok image uri, '' for Lazada), url (marketplace CDN URL), width, height, file_name, size_bytes, uploaded_by (email | null), created_at}`. Response has `Cache-Control: no-store`.
+- **Errors**: `400 INVALID_REQUEST`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`
+
+### POST /product-images
+- **Description**: Uploads **one** image to a shop and stores the result. TikTok: `POST /product/202309/images/upload` (multipart `data` + `use_case`, header `x-tts-access-token`). Lazada: `POST /image/upload` (multipart `image`; system params and `sign` in the query). Both use the shop's access token from `market_token`; no retry on an expired token.
+- **Auth**: session, same origin, permission `orders.write`
+- **Request**: `multipart/form-data`: `file` (JPG or PNG, judged by its bytes, ≤ 5 MB, must decode), `market_place` (`Tiktok` | `Lazada`), `shop_id`, `use_case` (TikTok only, default `MAIN_IMAGE`; ignored for Lazada). The whole body is limited to 6 MB.
+- **Response**: 200, `data[0]` = `ProductImage` (width/height from TikTok, or read from the file for Lazada). Response has `Cache-Control: no-store`.
+- **Errors**: `400 INVALID_IMAGE` (not JPG/PNG, unreadable, empty, over 5 MB — nothing is sent to the marketplace), `400 INVALID_REQUEST` (no file, unknown marketplace or use case), `404 NOT_FOUND` (unknown or disabled shop, or a shop without a token), `502 MARKETPLACE_ERROR` (the marketplace refused or didn't answer; its code and message are logged, nothing is stored), `401`, `403 FORBIDDEN` / `FORBIDDEN_ORIGIN`
 
 ## Marketplaces
 

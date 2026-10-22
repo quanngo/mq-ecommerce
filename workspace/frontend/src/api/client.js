@@ -42,18 +42,28 @@ export function onUnauthorized(listener) {
  * @param {unknown} [body]
  * @returns {Promise<any>} data[0] of the response, or undefined
  */
-export async function apiRequest(method, path, body) {
-  const headers = { Accept: 'application/json', 'Accept-Language': currentLanguage() };
+export function apiRequest(method, path, body) {
+  const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  return send(method, path, headers, body === undefined ? undefined : JSON.stringify(body));
+}
+
+/**
+ * Multipart upload (POST). The browser sets the multipart Content-Type and boundary itself.
+ * @param {string} path  relative to /api/v1
+ * @param {FormData} form
+ * @returns {Promise<any>} data[0] of the response, or undefined
+ */
+export function apiUpload(path, form) {
+  return send('POST', path, {}, form);
+}
+
+async function send(method, path, extraHeaders, body) {
+  const headers = { Accept: 'application/json', 'Accept-Language': currentLanguage(), ...extraHeaders };
 
   let res;
   try {
-    res = await fetch(`/api/v1${path}`, {
-      method,
-      credentials: 'same-origin',
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    res = await fetch(`/api/v1${path}`, { method, credentials: 'same-origin', headers, body });
   } catch {
     throw new ApiError(0, 'NETWORK_ERROR');
   }

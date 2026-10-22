@@ -7,7 +7,11 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import styles from './AppLayout.module.css';
 import ui from './ui.module.css';
 
-/** Top bar + navigation for every signed-in page. Menu items follow permissions. */
+/**
+ * Shell of every signed-in page: the main menu in a sidebar on the left (menu
+ * items follow permissions; language, user and logout at its foot), the page on
+ * the right. Below 768px the sidebar becomes a bar above the page.
+ */
 export function AppLayout() {
   const { t } = useTranslation();
   const { state, logout, can } = useAuth();
@@ -31,7 +35,7 @@ export function AppLayout() {
 
   return (
     <div className={styles.layout}>
-      <header className={styles.topbar}>
+      <aside className={styles.sidebar}>
         <span className={styles.brand}>{t('common.brand')}</span>
         <nav className={styles.nav} aria-label={t('nav.main')}>
           <NavLink to="/profile" className={linkClass}>
@@ -42,30 +46,38 @@ export function AppLayout() {
               {t('nav.orders')}
             </NavLink>
           )}
+          {can('orders.write') && (
+            <NavLink to="/product-images" className={linkClass}>
+              {t('nav.productImages')}
+            </NavLink>
+          )}
           {can('users.read') && (
             <NavLink to="/users" className={linkClass}>
               {t('nav.users')}
             </NavLink>
           )}
         </nav>
-        <div className={styles.right}>
+        <div className={styles.footer}>
           <LanguageSwitcher onSaveResult={setLanguageSaveFailed} />
-          <span className={styles.who} title={state.user?.email}>
-            {state.user?.display_name || state.user?.email}
-          </span>
+          <div className={styles.who} title={state.user?.email}>
+            <span className={styles.whoName}>{state.user?.display_name || state.user?.email}</span>
+            {state.user?.display_name && <span className={styles.whoEmail}>{state.user.email}</span>}
+          </div>
           <button className={styles.logout} type="button" onClick={() => setConfirming(true)}>
             {t('nav.logout')}
           </button>
         </div>
-      </header>
+      </aside>
 
-      {languageSaveFailed && (
-        <div className={`${ui.error} ${styles.banner}`} role="alert">
-          {t('common.languageSaveFailed')}
-        </div>
-      )}
+      <div className={styles.content}>
+        {languageSaveFailed && (
+          <div className={`${ui.error} ${styles.banner}`} role="alert">
+            {t('common.languageSaveFailed')}
+          </div>
+        )}
 
-      <Outlet />
+        <Outlet />
+      </div>
 
       <ConfirmDialog
         open={confirming}

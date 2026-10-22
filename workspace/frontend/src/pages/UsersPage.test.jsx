@@ -12,7 +12,7 @@ async function openUsers(role = 'admin') {
   return userEvent.setup();
 }
 
-const row = (email) => screen.getByText(email).closest('tr');
+const row = (email) => within(screen.getByRole('table')).getByText(email).closest('tr');
 
 describe('navigation and access', () => {
   it('shows the "Người dùng" menu only with users.read', async () => {

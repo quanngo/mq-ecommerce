@@ -23,7 +23,7 @@ describe('ProtectedRoute + ProfilePage', () => {
 
   it('shows the signed-in user', async () => {
     await openProfile();
-    expect(screen.getByText('an.nguyen@mq.com')).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).getByText('an.nguyen@mq.com')).toBeInTheDocument(); // the sidebar shows it too
     expect(screen.getByText('Email & mật khẩu')).toBeInTheDocument();
     expect(screen.getByText('AN')).toBeInTheDocument(); // initials, no avatar
   });

@@ -2,7 +2,7 @@
 //
 //   npm run dev:mock   ->  http://localhost:8088
 //
-// Starts an in-memory fake of the backend's /api/v1/auth, /users, /roles and /orders contract (same
+// Starts an in-memory fake of the backend's /api/v1/auth, /users, /roles, /orders and /product-images contract (same
 // HTTP-200 {code, message, data[]} envelope, same cookie, same error codes)
 // on :9099 and runs Vite with /api proxied to it. Google sign-in is replaced
 // by a local "consent" page. Dev only: nothing here is used by the real app.
@@ -158,6 +158,62 @@ const managersLeft = (excludeId) =>
   users.filter((u) => u.id !== excludeId && u.status === 'active' && roleOf(u).permissions.includes('users.manage')).length;
 
 const safeNext = (n) => (n && n.startsWith('/') && !n.startsWith('//') && !n.includes('://') && !n.startsWith('/login') ? n : '/profile');
+
+// Product images (EC-10). The real backend sends the file to TikTok/Lazada and
+// keeps the URL they return; here the "marketplace URL" is a data: URL of the
+// uploaded file, so thumbnails work without any CDN.
+const IMAGE_SHOPS = [
+  { market_place: 'Tiktok', shop_id: 'tiktok-shop-01' },
+  { market_place: 'Tiktok', shop_id: 'tiktok-shop-02' },
+  { market_place: 'Lazada', shop_id: 'lazada-shop-01' },
+];
+const TIKTOK_USE_CASES = ['MAIN_IMAGE', 'ATTRIBUTE_IMAGE', 'DESCRIPTION_IMAGE', 'CERTIFICATION_IMAGE', 'SIZE_CHART_IMAGE'];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const productImages = []; // newest first
+
+const readBody = (req, limit) =>
+  new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size <= limit) chunks.push(c);
+    });
+    req.on('end', () => resolve(size > limit ? null : Buffer.concat(chunks)));
+  });
+
+/** multipart/form-data -> { field: string | { name, type, data: Buffer } } */
+function parseMultipart(buf, contentType) {
+  const boundary = /boundary=(.+)$/.exec(contentType ?? '')?.[1];
+  if (!boundary || !buf) return null;
+  const out = {};
+  const delim = Buffer.from(`--${boundary}`);
+  let pos = buf.indexOf(delim);
+  while (pos >= 0) {
+    const next = buf.indexOf(delim, pos + delim.length);
+    if (next < 0) break;
+    const part = buf.subarray(pos + delim.length + 2, next - 2); // skip CRLF after delimiter and before the next
+    const sep = part.indexOf('\r\n\r\n');
+    const head = part.subarray(0, sep).toString('utf8');
+    const body = part.subarray(sep + 4);
+    const name = /name="([^"]*)"/.exec(head)?.[1];
+    const filename = /filename="([^"]*)"/.exec(head)?.[1];
+    const type = /Content-Type: ([^\r\n]+)/i.exec(head)?.[1] ?? '';
+    if (name) out[name] = filename === undefined ? body.toString('utf8') : { name: filename, type, data: Buffer.from(body) };
+    pos = next;
+  }
+  return out;
+}
+
+/** Same check as the backend: JPG/PNG by magic bytes, 1 byte..5 MB. */
+const imageKind = (data) =>
+  data.length === 0 || data.length > MAX_IMAGE_BYTES
+    ? null
+    : data[0] === 0xff && data[1] === 0xd8
+      ? 'image/jpeg'
+      : data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+        ? 'image/png'
+        : null;
 
 const readJson = (req) =>
   new Promise((resolve) => {
@@ -344,6 +400,52 @@ const mock = http.createServer(async (req, res) => {
         if (body.status === 'disabled') revokeAll(target.id);
       }
       return ok(res, managed(target, s.user.locale));
+    }
+
+    case 'GET /api/v1/product-images/shops':
+    case 'GET /api/v1/product-images':
+    case 'POST /api/v1/product-images': {
+      const s = sessionUser(req);
+      if (!s) return fail(res, 401, 'UNAUTHENTICATED');
+      if (!roleOf(s.user).permissions.includes('orders.write')) return fail(res, 403, 'FORBIDDEN');
+      if (route === 'GET /api/v1/product-images/shops') return ok(res, { shops: IMAGE_SHOPS, tiktok_use_cases: TIKTOK_USE_CASES });
+      if (route === 'GET /api/v1/product-images') {
+        const mp = url.searchParams.get('market_place') ?? '';
+        const shop = url.searchParams.get('shop_id') ?? '';
+        const page = Number(url.searchParams.get('page') || 1);
+        const size = Number(url.searchParams.get('page_size') || 24);
+        if (mp && !['Tiktok', 'Lazada'].includes(mp)) return fail(res, 400, 'INVALID_REQUEST');
+        const matches = productImages.filter((i) => (!mp || i.market_place === mp) && (!shop || i.shop_id === shop));
+        return ok(res, { images: matches.slice((page - 1) * size, page * size), total: matches.length, page, page_size: size });
+      }
+      const form = parseMultipart(await readBody(req, MAX_IMAGE_BYTES + 1024 * 1024), req.headers['content-type']);
+      if (!form) return fail(res, 400, 'INVALID_IMAGE');
+      const shop = IMAGE_SHOPS.find((x) => x.market_place === form.market_place && x.shop_id === form.shop_id);
+      if (!['Tiktok', 'Lazada'].includes(form.market_place) || !form.shop_id || !form.file) return fail(res, 400, 'INVALID_REQUEST');
+      const tiktok = form.market_place === 'Tiktok';
+      const useCase = tiktok ? form.use_case || 'MAIN_IMAGE' : '';
+      if (tiktok && !TIKTOK_USE_CASES.includes(useCase)) return fail(res, 400, 'INVALID_REQUEST');
+      const kind = imageKind(form.file.data);
+      if (!kind) return fail(res, 400, 'INVALID_IMAGE');
+      if (!shop) return fail(res, 404, 'NOT_FOUND');
+      if (/fail/i.test(form.file.name)) return fail(res, 502, 'MARKETPLACE_ERROR'); // name a file "...fail..." to see a refusal
+      const id = productImages.length + 1;
+      const img = {
+        id,
+        market_place: form.market_place,
+        shop_id: form.shop_id,
+        use_case: useCase,
+        uri: tiktok ? `tos-maliva-i-mock/${id}` : '',
+        url: `data:${kind};base64,${form.file.data.toString('base64')}`,
+        width: 0,
+        height: 0,
+        file_name: form.file.name,
+        size_bytes: form.file.data.length,
+        uploaded_by: s.user.email,
+        created_at: new Date().toISOString(),
+      };
+      productImages.unshift(img);
+      return ok(res, img);
     }
 
     case 'GET /api/v1/orders':

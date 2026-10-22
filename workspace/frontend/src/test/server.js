@@ -55,6 +55,12 @@ export const backend = {
   localeError: null, // error code returned by PUT /auth/me/locale
   localeCalls: [], // bodies of PUT /auth/me/locale
   acceptLanguage: null, // Accept-Language of the last request
+  imageShops: [], // shops images can be uploaded to
+  images: [], // uploaded product images, newest first
+  imageUploads: [], // form fields of each POST /product-images ({market_place, shop_id, use_case, file_name, size})
+  imageError: null, // error code returned by POST /product-images
+  imageFailNames: [], // file names the fake marketplace refuses (MARKETPLACE_ERROR)
+  lastImagesQuery: null, // query of the last GET /product-images
 };
 
 /**
@@ -85,6 +91,16 @@ export function resetBackend() {
     localeError: null,
     localeCalls: [],
     acceptLanguage: null,
+    imageShops: [
+      { market_place: 'Tiktok', shop_id: 'tt-shop' },
+      { market_place: 'Tiktok', shop_id: 'tt-shop-2' },
+      { market_place: 'Lazada', shop_id: 'lz-shop' },
+    ],
+    images: [],
+    imageUploads: [],
+    imageError: null,
+    imageFailNames: [],
+    lastImagesQuery: null,
     users: [
       managed({ id: 7, email: 'an.nguyen@mq.com', display_name: 'An Nguyen', role: 'admin' }),
       managed({ id: 8, email: 'op@mq.com', display_name: 'Operator', role: 'operator' }),
@@ -175,6 +191,27 @@ function listOrders(url) {
   return { orders: matches.slice((page - 1) * size, page * size).map(summary), total: matches.length, page, page_size: size };
 }
 
+/**
+ * Minimal multipart/form-data reader. request.formData() can't be used under jsdom
+ * (undici rejects jsdom's File), so text fields come back as strings and a file
+ * as { name, size }.
+ */
+async function readMultipart(request) {
+  const boundary = /boundary=(.+)$/.exec(request.headers.get('content-type') ?? '')?.[1];
+  const raw = new Uint8Array(await request.arrayBuffer());
+  const text = new TextDecoder('latin1').decode(raw);
+  const out = {};
+  for (const part of text.split(`--${boundary}`).slice(1, -1)) {
+    const sep = part.indexOf('\r\n\r\n');
+    const head = part.slice(0, sep);
+    const body = part.slice(sep + 4).replace(/\r\n$/, '');
+    const name = /name="([^"]*)"/.exec(head)?.[1];
+    const filename = /filename="([^"]*)"/.exec(head)?.[1];
+    out[name] = filename === undefined ? body : { name: filename, size: body.length };
+  }
+  return out;
+}
+
 const ok = (data) => HttpResponse.json({ code: 200, message: 'Success', data: data === undefined ? [] : [data] });
 const fail = (code, message) => HttpResponse.json({ code, message });
 const guard = (perm) => (!backend.signedIn ? fail(401, 'UNAUTHENTICATED') : !can(perm) ? fail(403, 'FORBIDDEN') : null);
@@ -237,6 +274,55 @@ export const server = setupServer(
     if (backend.ordersError) return fail(500, backend.ordersError);
     const order = backend.orders.find((o) => o.id === Number(params.id));
     return order ? ok({ order }) : fail(404, 'NOT_FOUND');
+  }),
+
+  http.get('*/api/v1/product-images/shops', () =>
+    guard('orders.write') ?? ok({ shops: backend.imageShops, tiktok_use_cases: ['MAIN_IMAGE', 'ATTRIBUTE_IMAGE', 'DESCRIPTION_IMAGE', 'CERTIFICATION_IMAGE', 'SIZE_CHART_IMAGE'] }),
+  ),
+  http.get('*/api/v1/product-images', ({ request }) => {
+    const denied = guard('orders.write');
+    if (denied) return denied;
+    const p = new URL(request.url).searchParams;
+    backend.lastImagesQuery = Object.fromEntries(p);
+    const matches = backend.images.filter(
+      (i) => (!p.get('market_place') || i.market_place === p.get('market_place')) && (!p.get('shop_id') || i.shop_id === p.get('shop_id')),
+    );
+    const page = Number(p.get('page') || 1);
+    const size = Number(p.get('page_size') || 24);
+    return ok({ images: matches.slice((page - 1) * size, page * size), total: matches.length, page, page_size: size });
+  }),
+  http.post('*/api/v1/product-images', async ({ request }) => {
+    const denied = guard('orders.write');
+    if (denied) return denied;
+    const form = await readMultipart(request);
+    const upload = {
+      market_place: form.market_place ?? null,
+      shop_id: form.shop_id ?? null,
+      use_case: form.use_case ?? null,
+      file_name: form.file?.name ?? null,
+      size: form.file?.size ?? 0,
+    };
+    backend.imageUploads.push(upload);
+    if (backend.imageError) return fail(400, backend.imageError);
+    if (backend.imageFailNames.includes(upload.file_name)) return fail(502, 'MARKETPLACE_ERROR');
+    const tiktok = upload.market_place === 'Tiktok';
+    const id = backend.images.length + 1;
+    const img = {
+      id,
+      market_place: upload.market_place,
+      shop_id: upload.shop_id,
+      use_case: tiktok ? upload.use_case || 'MAIN_IMAGE' : '',
+      uri: tiktok ? `tos/img-${id}` : '',
+      url: `https://cdn.example/${upload.market_place.toLowerCase()}/${id}.png`,
+      width: 800,
+      height: 800,
+      file_name: upload.file_name,
+      size_bytes: upload.size,
+      uploaded_by: testUser.email,
+      created_at: '2026-10-18T03:00:00Z',
+    };
+    backend.images.unshift(img);
+    return ok(img);
   }),
 
   http.get('*/api/v1/roles', () => guard('users.read') ?? ok({ roles: localizedRoles() })),

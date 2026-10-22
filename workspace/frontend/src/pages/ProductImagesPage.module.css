@@ -1,0 +1,224 @@
+/* Wider than ui.main (960px) for the image grid; element + class wins regardless of CSS order. */
+main.wide {
+  max-width: 1200px;
+}
+
+.intro {
+  margin: -8px 0 20px;
+  font-size: 14px;
+}
+
+/* ---------- upload ---------- */
+
+.uploadForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.uploadFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .uploadFields {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fileInput {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  max-width: 100%;
+}
+
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.queueItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  min-width: 0;
+}
+
+.queueThumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--border);
+}
+
+.queueInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.removeButton {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.removeButton:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.removeButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.problem {
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+/* ---------- list ---------- */
+
+.listHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.listHeader h2 {
+  margin: 0;
+}
+
+.listFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.listFilters label {
+  min-width: 180px;
+}
+
+@media (max-width: 520px) {
+  .listFilters,
+  .listFilters label {
+    width: 100%;
+  }
+}
+
+.summary {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.thumbLink {
+  display: block;
+  aspect-ratio: 1 / 1;
+  background: var(--surface-muted);
+}
+
+.thumbLink:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.fileName {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.meta {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pageInfo {
+  color: var(--text-muted);
+  font-size: 14px;
+}

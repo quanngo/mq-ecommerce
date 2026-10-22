@@ -21,6 +21,8 @@
   "error.INVALID_ROLE": "Vai trò không hợp lệ.",
   "error.LAST_ADMIN": "Không thể thực hiện: đây là quản trị viên cuối cùng có quyền quản lý người dùng.",
   "error.CANNOT_MODIFY_SELF": "Bạn không thể tự đổi vai trò, khoá hoặc đặt lại mật khẩu của chính mình ở đây.",
+  "error.INVALID_IMAGE": "Ảnh không hợp lệ: chỉ nhận JPG hoặc PNG, tối đa 5 MB.",
+  "error.MARKETPLACE_ERROR": "Sàn từ chối hoặc không phản hồi. Vui lòng thử lại sau.",
 
   "status.200": "Thành công",
   "status.400": "Yêu cầu không hợp lệ",

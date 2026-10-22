@@ -54,6 +54,10 @@ var (
 	ErrInvalidRole   = &AuthError{Code: "INVALID_ROLE", Status: http.StatusBadRequest}
 	ErrLastAdmin     = &AuthError{Code: "LAST_ADMIN", Status: http.StatusConflict}         // would leave nobody able to manage users
 	ErrSelfModify    = &AuthError{Code: "CANNOT_MODIFY_SELF", Status: http.StatusConflict} // own role/status/reset via user management
+
+	// Product images (EC-10).
+	ErrInvalidImage = &AuthError{Code: "INVALID_IMAGE", Status: http.StatusBadRequest}     // not a JPG/PNG, unreadable, empty or too large
+	ErrMarketplace  = &AuthError{Code: "MARKETPLACE_ERROR", Status: http.StatusBadGateway} // the marketplace refused the call or was unreachable
 )
 
 // wrapAuth keeps base's Code and Status and attaches cause for the logs.

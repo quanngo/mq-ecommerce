@@ -31,6 +31,7 @@ type apiServer struct {
 	authService      services.AuthService
 	usersService     services.UserAdminService
 	ordersService    services.OrderService
+	imagesService    services.ProductImageService
 }
 
 type workerInstance struct {
@@ -116,6 +117,7 @@ func Initialize() *apiServer {
 	authService := newAuthService(db, utils.AppConfig.Auth, newGoogleClient(utils.AppConfig.Auth.Google))
 	usersService := services.NewUserAdminService(repositories.NewUserRepo(db), repositories.NewRoleRepo(db), repositories.NewSessionRepo(db), authService)
 	ordersService := services.NewOrderService(repositories.NewOrderQueryRepo(db))
+	imagesService := services.NewProductImageService(apiMiddleware, tokenRepo, repositories.NewProductImageRepo(db))
 	authService.WarnIfDefaultAdminPassword(context.Background())
 
 	return &apiServer{
@@ -127,6 +129,7 @@ func Initialize() *apiServer {
 		authService:      authService,
 		usersService:     usersService,
 		ordersService:    ordersService,
+		imagesService:    imagesService,
 	}
 }
 
@@ -167,6 +170,7 @@ func (apiServer *apiServer) Start() {
 		AuthSvc:       apiServer.authService,
 		UsersSvc:      apiServer.usersService,
 		OrdersSvc:     apiServer.ordersService,
+		ImagesSvc:     apiServer.imagesService,
 	})
 
 	app.Run(fmt.Sprintf(":%d", apiServer.cfg.Server.Port))

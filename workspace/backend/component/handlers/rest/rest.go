@@ -17,8 +17,9 @@ type ApiServer struct {
 	TiktokSvc services.TikTokService
 	LazadaSvc services.LazadaService
 	AuthSvc   services.AuthService
-	UsersSvc  services.UserAdminService // nil = user-management routes not mounted
-	OrdersSvc services.OrderService     // nil = /orders routes not mounted
+	UsersSvc  services.UserAdminService    // nil = user-management routes not mounted
+	OrdersSvc services.OrderService        // nil = /orders routes not mounted
+	ImagesSvc services.ProductImageService // nil = /product-images routes not mounted
 }
 
 func APIRoutes(app *gin.Engine, apiServer *ApiServer) {
@@ -40,6 +41,11 @@ func APIRoutes(app *gin.Engine, apiServer *ApiServer) {
 	if apiServer.OrdersSvc != nil {
 		ordersHandler := &OrderHandler{Svc: apiServer.OrdersSvc}
 		ordersHandler.Router(apiGroup.Group("/orders", requireAuth))
+	}
+
+	if apiServer.ImagesSvc != nil {
+		imagesHandler := &ProductImageHandler{Svc: apiServer.ImagesSvc}
+		imagesHandler.Router(apiGroup.Group("/product-images", requireAuth), sameOrigin)
 	}
 
 	tiktokHandler := &TikTokHandler{TikTokService: apiServer.TiktokSvc}
